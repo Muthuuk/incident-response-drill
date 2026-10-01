@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automated Incident Response Lessons</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a broadcast studio — lesson rail on the left, 16:9 stage (slide + presenter) with captions and transport controls, quiz replaces the stage after each lesson */
+:root{
+  --bg:#EDF0F3; --panel:#FFFFFF; --sunk:#E3E8ED; --ink:#17202B; --muted:#5A6676; --line:#CBD3DC;
+  --accent:#0B5D7A; --accent-ink:#FFFFFF; --accent-soft:#D6E8EF;
+  --stage:#0F2A36; --stage-ink:#F2F6F8; --stage-muted:#9FB8C4; --stage-hi:#F2B35E;
+  --crit:#B42318; --crit-soft:#FBE4E1; --ok:#1D7A46; --ok-soft:#DDF1E5; --warn:#A35A00;
+  --skin:#C98E6B; --skin-dk:#A8704F; --hair:#2B211C; --jacket:#24495A; --shirt:#F4F6F8;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",Consolas,"Liberation Mono",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151C; --panel:#18202A; --sunk:#0C1117; --ink:#E4E9EF; --muted:#9AA6B4; --line:#2B3644;
+  --accent:#5FB3D3; --accent-ink:#0A1A22; --accent-soft:#16323F;
+  --stage:#0B1E27; --stage-ink:#F2F6F8; --stage-muted:#8FA9B5; --stage-hi:#F2B35E;
+  --crit:#F28B82; --crit-soft:#3A1C1A; --ok:#6CCB93; --ok-soft:#163323; --warn:#F2B35E;
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#10151C; --panel:#18202A; --sunk:#0C1117; --ink:#E4E9EF; --muted:#9AA6B4; --line:#2B3644;
+  --accent:#5FB3D3; --accent-ink:#0A1A22; --accent-soft:#16323F;
+  --stage:#0B1E27; --stage-ink:#F2F6F8; --stage-muted:#8FA9B5; --stage-hi:#F2B35E;
+  --crit:#F28B82; --crit-soft:#3A1C1A; --ok:#6CCB93; --ok-soft:#163323; --warn:#F2B35E;
+  color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0;padding-inline:16px;padding-block:16px 40px}
+.wrap{max-width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(1.5rem,3vw,2.1rem);font-weight:700}
+h2{font-size:1.2rem;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+button,select{font:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:.55rem 1rem;border-radius:var(--r);font-weight:600}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.head{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:end;justify-content:space-between}
+.head .sub{color:var(--muted);max-width:60ch}
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;align-items:start}
+
+/* lesson rail */
+.rail{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:6px}
+.lesson-btn{display:grid;grid-template-columns:2rem minmax(0,1fr);gap:8px;text-align:left;border:1px solid transparent;background:transparent;color:var(--ink);border-radius:var(--r);padding:8px}
+.lesson-btn:hover{background:var(--sunk)}
+.lesson-btn.on{border-color:var(--accent);background:var(--accent-soft)}
+.lesson-btn .n{font-family:var(--f-mono);font-size:.8rem;width:2rem;height:2rem;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:var(--panel)}
+.lesson-btn.done .n{background:var(--ok);border-color:var(--ok);color:var(--panel)}
+.lesson-btn b{font-family:var(--f-display);font-weight:600;display:block;line-height:1.2}
+.lesson-btn small{color:var(--muted);font-size:.78rem}
+.rail .total{border-top:1px solid var(--line);padding-top:10px;margin-top:4px;font-size:.85rem;color:var(--muted)}
+
+/* stage */
+.player{display:flex;flex-direction:column;gap:0;min-width:0}
+.stage{background:var(--stage);color:var(--stage-ink);border-radius:var(--r) var(--r) 0 0;aspect-ratio:16/9;max-width:100%;display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);overflow:hidden;position:relative}
+.slide{padding:clamp(14px,3.2%,36px);display:flex;flex-direction:column;gap:clamp(6px,1.4%,14px);min-width:0;overflow:hidden}
+.slide .tag{font-family:var(--f-mono);font-size:clamp(.6rem,1.1vw,.75rem);letter-spacing:.1em;text-transform:uppercase;color:var(--stage-hi)}
+.slide h2{font-size:clamp(1.05rem,2.5vw,1.9rem);color:var(--stage-ink);font-weight:700}
+.slide ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:clamp(4px,1vw,10px)}
+.slide li{font-size:clamp(.72rem,1.45vw,1.05rem);line-height:1.35;padding-left:1.1em;position:relative;color:var(--stage-muted);opacity:.28;transition:opacity .4s ease,color .4s ease}
+.slide li::before{content:"";position:absolute;left:0;top:.5em;width:.45em;height:.45em;border-radius:2px;background:var(--stage-muted)}
+.slide li.shown{opacity:1;color:var(--stage-ink)}
+.slide li.now{color:var(--stage-hi)}
+.slide li.now::before{background:var(--stage-hi)}
+.flow{display:flex;flex-wrap:wrap;gap:6px}
+.flow span{font-family:var(--f-mono);font-size:clamp(.58rem,1.05vw,.78rem);padding:.25em .6em;border:1px solid var(--stage-muted);border-radius:999px;color:var(--stage-muted);transition:all .4s ease}
+.flow span.on{border-color:var(--stage-hi);color:var(--stage-hi)}
+.presenter{position:relative;display:flex;align-items:flex-end;justify-content:center;min-width:0}
+.presenter svg{width:100%;height:96%;display:block}
+.presenter .name{position:absolute;left:8%;bottom:6%;font-family:var(--f-mono);font-size:clamp(.55rem,1vw,.72rem);background:var(--accent);color:var(--accent-ink);padding:.2em .6em;border-radius:3px}
+#mouthA,#mouthB,#mouthC{transition:none}
+.eyes{transform-origin:100px 96px;transition:transform .08s}
+.eyes.blink{transform:scaleY(.1)}
+.armR{transform-origin:138px 168px;transition:transform .6s cubic-bezier(.3,1.4,.5,1)}
+.armR.point{transform:rotate(-58deg)}
+.headg{transform-origin:100px 130px;transition:transform .5s ease}
+.headg.tilt{transform:rotate(-4deg)}
+.captions{background:var(--stage);color:var(--stage-ink);font-size:clamp(.85rem,1.6vw,1.05rem);padding:10px 16px 12px;min-height:3.6em;border-top:1px solid rgba(255,255,255,.08)}
+.captions[hidden]{display:none!important}
+.transport{background:var(--panel);border:1px solid var(--line);border-top:none;border-radius:0 0 var(--r) var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.prog{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.prog span{display:block;height:100%;background:var(--accent);width:0;transition:width .3s linear}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.ctrls .grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.icon-btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:var(--r);padding:.4rem .7rem;font-weight:500}
+.icon-btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);min-width:6.5rem}
+.time{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+select{padding:.35rem .5rem;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);max-width:14rem}
+.chk{display:flex;gap:6px;align-items:center;font-size:.85rem}
+.notice{font-size:.82rem;color:var(--muted)}
+
+/* quiz */
+.quiz{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px}
+.qcard{display:flex;flex-direction:column;gap:8px}
+.qcard .qt{font-family:var(--f-display);font-size:1.1rem;font-weight:600}
+.qopt{display:flex;gap:10px;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:var(--r);padding:9px 12px}
+.qopt:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
+.qopt .k{font-family:var(--f-mono);color:var(--accent);min-width:1.2em}
+.qopt.right{border-color:var(--ok);background:var(--ok-soft)}
+.qopt.wrong{border-color:var(--crit);background:var(--crit-soft)}
+.qopt:disabled{cursor:default}
+.why{font-size:.9rem;padding:10px 12px;border-radius:var(--r);background:var(--sunk)}
+.dots{display:flex;gap:6px}
+.dots i{width:10px;height:10px;border-radius:50%;background:var(--sunk);border:1px solid var(--line)}
+.dots i.r{background:var(--ok);border-color:var(--ok)} .dots i.w{background:var(--crit);border-color:var(--crit)} .dots i.c{border-color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.result{font-family:var(--f-display);font-size:1.6rem;font-weight:700}
+.record{font-family:var(--f-mono);font-size:.75rem;background:var(--sunk);border:1px solid var(--line);border-radius:var(--r);padding:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .rail{flex-direction:row;overflow-x:auto}
+  .lesson-btn{min-width:200px}
+  .rail .total{display:none}
+}
+@media (max-width:620px){
+  .stage{grid-template-columns:minmax(0,1fr);aspect-ratio:auto}
+  .presenter{height:150px;order:-1;justify-content:flex-start;padding-left:8px}
+  .presenter svg{width:auto;height:150px}
+  .presenter .name{left:130px;bottom:14px}
+  .slide li{font-size:.85rem} .slide h2{font-size:1.15rem}
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div><p class="eyebrow">Chapter 15 · AI and Machine Learning in Cybersecurity</p><h1>Automated Incident Response Lessons</h1></div>
+    <p class="sub">Five short video lessons, each about five minutes, with a quick quiz after each one. Press <b>Play</b> to start the presenter.</p>
+  </header>
+  <div class="layout">
+    <nav class="rail" id="rail" aria-label="Lessons"></nav>
+    <main class="player" id="player"></main>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   Video lessons for Chapter 15 — narrated by the browser's own voice.
+   Portal set-up (optional), defined before this script:
+     window.IRLESSON_CONFIG = { orgName:"…", passMark:75, postMessageOrigin:"https://portal.example.org" }
+   After each quiz the page posts {type:"irlesson-result", …} to its parent frame.
+   ===================================================================== */
+var CFG=Object.assign({orgName:"",passMark:75,postMessageOrigin:"*"},window.IRLESSON_CONFIG||{});
+
+/* Each slide: t = title, b = bullets, flow = optional chip row, s = script [[bulletIndex or -1, text], …] */
+var LESSONS=[
+{ title:"Why incident response needs automation", slides:"Slides 1–6",
+  deck:[
+  { tag:"Chapter 15", t:"Automated Incident Response and Orchestration", b:["AI and Machine Learning in Cybersecurity","Five lessons · about five minutes each · quiz after each"],
+    s:[[-1,"Hello, and welcome to Chapter 15: automated incident response and orchestration."],
+       [0,"This chapter is part of our course on AI and machine learning in cybersecurity."],
+       [-1,"An incident is anything that threatens your systems or data. A phishing email that steals a password is an incident. So is ransomware locking your files."],
+       [-1,"Incident response is everything you do from the moment you spot that problem to the moment you are safely back to normal."],
+       [1,"We'll cover it in five short lessons. Each one lasts about five minutes and ends with a few quick questions to check your understanding."]]},
+  { tag:"Learning objectives", t:"By the end of this chapter you will be able to", b:["Explain the basics of automated incident response","Identify machine learning methods used to detect threats","Design response workflows using playbooks","Evaluate SOAR platforms and how they are used","Analyse the challenges of AI-driven security automation"],
+    s:[[-1,"Let's start with what you'll be able to do by the end."],
+       [0,"First, explain the basic ideas behind automated incident response: what gets automated, and why."],
+       [1,"Second, identify the machine learning methods that help computers spot threats."],
+       [2,"Third, design response workflows using playbooks. A playbook is simply a written recipe of steps for handling a type of incident."],
+       [3,"Fourth, evaluate SOAR platforms. SOAR stands for security orchestration, automation and response. These are the tools that bring all of this together."],
+       [4,"And fifth, analyse the challenges, because automation brings new risks as well as benefits."]]},
+  { tag:"The problem", t:"The incident response challenge", b:["Thousands of security alerts a day overwhelm security teams","Breaches take around 200 days to detect on average","Analysts face alert fatigue and skill shortages","Manual response can't keep pace with modern attacks","Organisations need machine-speed incident handling"],
+    s:[[-1,"So why do we need automation at all?"],
+       [0,"A typical security operations centre, or SOC, receives thousands of alerts every single day. Most are harmless. A few are serious. The hard part is telling them apart."],
+       [1,"Industry studies show it takes around two hundred days, on average, for an organisation to discover it has been breached. That's more than six months of an attacker inside the network."],
+       [2,"Analysts suffer from alert fatigue. When almost every alarm turns out to be false, people start to tune them out. And there simply aren't enough skilled analysts to go round."],
+       [3,"Meanwhile, attackers use automated tools that move in minutes. A person working through alerts by hand cannot keep up."],
+       [4,"So organisations need to handle incidents at machine speed, with people steering the important decisions."]]},
+  { tag:"Fundamentals", t:"The incident response lifecycle", flow:["Preparation","Detection & analysis","Containment","Eradication","Recovery","Post-incident"],
+    b:["Preparation: deploy detection tools and agree procedures","Detection & analysis: spot and classify incidents","Containment: isolate affected systems","Eradication: remove the threat completely","Recovery: restore systems to normal","Post-incident: learn and improve defences"],
+    s:[[-1,"Every incident follows the same basic journey, called the incident response lifecycle. There are six stages."],
+       [0,"Preparation happens before anything goes wrong. You install your detection tools and agree who does what."],
+       [1,"Detection and analysis is spotting that something is wrong, and working out what kind of incident it is and how serious."],
+       [2,"Containment means stopping it spreading. Think of closing the fire doors. You isolate the affected machines or accounts."],
+       [3,"Eradication means removing the cause completely: the malware, the stolen password, the hole the attacker came through."],
+       [4,"Recovery is bringing systems safely back into use, and watching closely in case the attacker returns."],
+       [5,"And post-incident activity is the learning stage: what went well, what didn't, and what to change so the next incident is smaller."]]},
+  { tag:"Fundamentals", t:"Where automation adds value", b:["Detection: machine learning spots threats at machine speed","Classification: sorts incidents by type and severity","Enrichment: pulls in threat intelligence in seconds","Response: runs agreed fixes automatically","Documentation: logs every action for reporting","Learning: improves from past incidents"],
+    s:[[-1,"Automation can help at almost every stage of that lifecycle."],
+       [0,"In detection, machine learning can sift millions of events and flag the unusual ones far faster than any person."],
+       [1,"In classification, it can sort incidents automatically, for example: this is phishing, and it's high severity."],
+       [2,"In enrichment, it gathers context in seconds. Has this web address been used in attacks before? Who owns this laptop?"],
+       [3,"In response, it can carry out agreed actions, such as blocking a sender or isolating a machine."],
+       [4,"In documentation, it records every step automatically, which saves hours when you write the report."],
+       [5,"And in learning, each closed incident becomes training data that makes the system better next time."]]},
+  { tag:"Worked example", t:"One phishing email, start to finish", flow:["Preparation","Detection & analysis","Containment","Eradication","Recovery","Post-incident"],
+    b:["09:06 · fake ‘overdue invoice’ email reaches 14 finance staff","09:09 · one clerk types their password into a lookalike page","09:12 · alert raised, risk score 82 out of 100","09:21 · sessions ended, password reset, forwarding rule removed","Next day · payments checked by phone, account monitored","Review · playbook updated, model retrained, refresher training"],
+    s:[[-1,"Let's follow one real-world style incident through all six stages, so the lifecycle feels concrete."],
+       [0,"At six minutes past nine, an email titled ‘overdue invoice’ lands in fourteen mailboxes in a finance team. Because the company prepared well, its email filter and web proxy are both watching."],
+       [1,"Three minutes later, one clerk clicks the link and types their Microsoft 365 password into a page that looks exactly like the real login page. It isn't."],
+       [2,"At nine twelve, the system joins the dots and raises an alert with a risk score of eighty-two out of a hundred. That's detection and analysis: something is wrong, it's credential phishing, and it's serious."],
+       [3,"Within minutes, the response team ends every open session on that account, resets the password, and removes a sneaky rule the attacker had set up to forward invoice emails outside the company. That's containment and eradication."],
+       [4,"For recovery, finance double-checks any payment changes by phone, using numbers they already hold, and the account is watched closely for a month."],
+       [5,"And in the post-incident review, nobody is blamed. Instead, the playbook gains an automatic check for forwarding rules, the model learns from the confirmed example, and the team gets a short refresher. Notice how automation sped up every stage, while people made the judgement calls. That's the end of lesson one. Let's check what you've learned."]]}
+  ],
+  quiz:[
+   {q:"What is the main reason organisations automate incident response?",o:["To replace all security staff","To handle the huge volume and speed of alerts that people can't keep up with by hand","To avoid writing incident reports","Because regulators require AI"],a:1,w:"Thousands of alerts a day and fast-moving attacks are more than people can handle by hand. Automation handles the volume, and people steer the key decisions."},
+   {q:"Which lifecycle stage is about stopping an incident from spreading?",o:["Preparation","Eradication","Containment","Recovery"],a:2,w:"Containment is like closing the fire doors. You isolate affected systems so the problem can't spread."},
+   {q:"What is ‘alert fatigue’?",o:["Servers slowing down under too many alerts","Analysts tuning out alarms because most turn out to be false","A type of denial-of-service attack","Batteries running down in monitoring devices"],a:1,w:"When most alerts are false alarms, people start ignoring them, and real attacks get missed."},
+   {q:"‘Enrichment’ in automated response means…",o:["Adding context, such as threat intelligence, to an alert quickly","Encrypting the alert","Deleting duplicate alerts","Paying analysts overtime"],a:0,w:"Enrichment gathers context in seconds, such as whether a web address is known to be malicious and who owns the device."}
+  ]},
+{ title:"How machine learning spots threats", slides:"Slides 7–10",
+  deck:[
+  { tag:"Machine learning for detection", t:"Teaching computers to spot attacks", b:["Learn patterns from data instead of hand-written rules","Three families: supervised, unsupervised, deep learning"],
+    s:[[-1,"Welcome to lesson two: how machine learning spots threats."],
+       [0,"Traditional security tools follow fixed rules written by people, such as ‘block this file’. Machine learning is different. It learns patterns from examples, a bit like how you learn to recognise a friend's handwriting."],
+       [1,"We'll look at three families: supervised learning, unsupervised learning, and deep learning."]]},
+  { tag:"Supervised learning", t:"Learning from labelled examples", b:["Random forests: many decision trees vote on the answer","Support vector machines: draw the best dividing line","Neural networks: learn complex, non-linear patterns","Needs labelled data: ‘normal’ vs ‘malicious’","Excellent for known types of threat","Can reach 95%+ accuracy on benchmark tests"],
+    s:[[-1,"Supervised learning is learning with a teacher. You show the computer thousands of examples that are already labelled: this one is safe, this one is malicious."],
+       [0,"A random forest builds many simple decision trees, each asking yes-or-no questions, then lets them vote. The majority wins, which makes it reliable."],
+       [1,"A support vector machine draws the best possible dividing line between safe and malicious examples, leaving the widest gap it can."],
+       [2,"Neural networks are loosely inspired by the brain. They can learn curved, complicated patterns that simple rules miss."],
+       [3,"The catch is that all of these need labelled data, and labelling takes real expert time."],
+       [4,"They work best for threats we've seen before, such as known families of malware or phishing."],
+       [5,"On standard test datasets they can reach over ninety-five per cent accuracy. Real networks are messier, so expect lower figures in practice."]]},
+  { tag:"Unsupervised learning", t:"Finding the odd one out", b:["K-means clustering: groups similar events together","Isolation forest: isolates unusual events quickly","Autoencoders: learn ‘normal’, flag what doesn't fit","No labels needed: finds patterns on its own","Key for spotting brand-new (zero-day) attacks","More false alarms, so needs careful tuning"],
+    s:[[-1,"Unsupervised learning has no teacher. Nobody labels the data. The computer looks for structure on its own."],
+       [0,"K-means clustering puts similar events into groups. If ten alerts land in the same group, they may be one incident."],
+       [1,"An isolation forest works on a neat idea. Unusual things are easy to separate from the crowd, so the events that get isolated fastest are the most suspicious."],
+       [2,"An autoencoder learns what normal looks like by trying to rebuild it. When it struggles to rebuild something, that something probably isn't normal."],
+       [3,"Because no labels are needed, these methods are cheaper to set up."],
+       [4,"And they're vital for brand-new attacks, called zero-days, that no labelled dataset contains yet."],
+       [5,"The trade-off: unusual doesn't always mean bad. A finance team working late at year-end looks unusual too. So these methods raise more false alarms and need tuning."]]},
+  { tag:"Deep learning", t:"Deep learning architectures", b:["CNNs: pick out features in network traffic","LSTMs: spot attack steps that unfold over time","Transformers: weigh which events matter most","Learn their own features from raw data","Handle messy, unstructured security data","Need lots of data and computing power"],
+    s:[[-1,"Deep learning uses large neural networks with many layers."],
+       [0,"Convolutional networks, or CNNs, were built for images, but they're also good at spotting patterns in network traffic, such as the shape of a data leak."],
+       [1,"LSTMs have a kind of memory. They can notice a suspicious sequence: a login, then a permission change, then a large download, even when the steps are spread over time."],
+       [2,"Transformers, the same idea behind modern chatbots, use attention. They work out which earlier events matter most to the current one."],
+       [3,"A big advantage is that deep learning finds useful features by itself, rather than an expert choosing them by hand."],
+       [4,"It can also work with raw, messy data such as log text."],
+       [5,"But it needs a lot of training data and computing power, and it's harder to explain, which matters later."]]},
+  { tag:"Worked example", t:"Three detectors, one suspicious login", b:["Supervised model: the email matches known phishing patterns","Isolation forest: a 3am login from a new country stands out","LSTM: login → new inbox rule → mass download is a risky sequence","Each sees a different part of the picture","Combined, they raise one confident, high-priority alert"],
+    s:[[-1,"Let's see how these three families work together on a single case."],
+       [-1,"Imagine an attacker has stolen a staff member's password with a phishing email, and logs in that night."],
+       [0,"The supervised model, trained on thousands of labelled phishing emails, had already scored the original email as likely phishing. It recognised a familiar pattern: a lookalike web address and an urgent request for payment."],
+       [1,"The isolation forest, which knows nothing about phishing, notices something else. This person has never logged in at three in the morning, or from that country. The login is easy to separate from normal behaviour, so it gets flagged as unusual."],
+       [2,"The LSTM, with its memory, sees the sequence. A login, then a new rule to forward emails, then a large download of files. Each step alone might be innocent. Together, in that order, they look like an attack."],
+       [3,"Each detector sees a different slice of the picture. On its own, each might produce a weak or uncertain alert that an analyst could easily dismiss."],
+       [4,"Combined, they produce one strong, high-priority alert with the evidence attached. This is why mature security teams use several kinds of model rather than betting everything on one. That's lesson two. Time for your quiz."]]}
+  ],
+  quiz:[
+   {q:"What does supervised learning need that unsupervised learning does not?",o:["A faster computer","Labelled examples, such as ‘normal’ and ‘malicious’","An internet connection","A SOAR platform"],a:1,w:"Supervised learning learns from examples someone has already labelled. Unsupervised learning finds patterns without labels."},
+   {q:"Which approach is most useful for spotting a brand-new (zero-day) attack?",o:["Supervised learning on last year's malware","Unsupervised anomaly detection","A fixed blocklist","Manual log review once a month"],a:1,w:"Zero-days aren't in any labelled dataset yet. Anomaly detection flags things that don't look normal, even if they've never been seen before."},
+   {q:"An isolation forest flags an event as suspicious when…",o:["It takes many splits to isolate","It can be separated from the rest very quickly","It arrives at night","It has a label"],a:1,w:"Unusual events stand apart from the crowd, so they are isolated in very few steps."},
+   {q:"Why is an LSTM good at detecting some attacks?",o:["It remembers sequences of events over time","It needs no data","It is easy to explain","It only looks at images"],a:0,w:"LSTMs have memory, so they can spot a suspicious chain of steps that unfolds over time."}
+  ]},
+{ title:"Orchestrating the response", slides:"Slides 11–16",
+  deck:[
+  { tag:"Response orchestration", t:"Choosing the response with a decision tree", b:["Look at severity, type of asset and data sensitivity","Branch to the right fix for that situation","High severity + sensitive data → isolate immediately","Clear logic that teams can check and audit","Easy to update as threats change","Balances speed against business risk"],
+    s:[[-1,"Welcome to lesson three. Detection tells you something is wrong. Orchestration decides what to do about it, and coordinates the tools that do it."],
+       [0,"A simple, powerful method is the decision tree. It asks questions about the incident: how severe is it? What kind of system is affected? How sensitive is the data?"],
+       [1,"Each answer leads down a branch to the right action."],
+       [2,"For example: high severity, on a server holding sensitive data, leads to immediate isolation. Low severity, on a test machine, might just raise a ticket."],
+       [3,"The big strength is that anyone can read the logic and check it. Auditors like that."],
+       [4,"It's also easy to update when new threats appear."],
+       [5,"And it lets you balance speed against business disruption, so you don't shut down a hospital system over a minor alert."]]},
+  { tag:"Playbooks", t:"Automated response playbooks", flow:["Extract headers","Check threat intel","Scan attachments","Quarantine emails","Disable credentials","Update filters"],
+    b:["Turn your procedures into steps a computer can run","Each incident type gets its own sequence of actions","Workflow engines handle order, timing and errors","Same response every time, at any hour","Can cut time to resolve by 70–95% vs manual"],
+    s:[[-1,"A playbook is a recipe for handling one type of incident."],
+       [0,"Automation turns your written procedures into steps a computer can actually run."],
+       [1,"Here's a phishing playbook. First, pull out the email's hidden header details. Then check the link against threat intelligence. Scan any attachments. Remove every copy of the email from every mailbox. Disable any password that was entered on the fake page. And finally, update the filters so it can't come back."],
+       [2,"The workflow engine handles the order of the steps, what happens if one fails, and who to call if a person needs to decide."],
+       [3,"The response is consistent: the same quality at three in the morning as at three in the afternoon."],
+       [4,"Organisations report cutting the mean time to resolve, called MTTR, by seventy to ninety-five per cent compared with doing it by hand."]]},
+  { tag:"Adaptive response", t:"Reinforcement learning", b:["An agent learns the best actions by trial and error","Q-learning: scores each action in each situation","Policy gradient: tunes the decision strategy directly","Reward = how well the incident was contained","Adapts to new threats without manual rewrites","Balances speed, thoroughness and disruption"],
+    s:[[-1,"Playbooks are fixed. Reinforcement learning tries to make responses that adapt."],
+       [0,"It works like training a dog with treats. A software agent tries actions and receives a reward when things go well."],
+       [1,"Q-learning keeps a score for every action in every situation, and gradually learns which scores are highest."],
+       [2,"Policy gradient methods skip the score table and tune the decision strategy directly."],
+       [3,"In security, the reward is based on how well the incident was contained, and at what cost."],
+       [4,"The promise is a system that adapts to new attacker behaviour without someone rewriting the rules."],
+       [5,"In practice this is mostly used in simulations today, because trial and error on a live network is risky."]]},
+  { tag:"Prioritisation", t:"Machine learning risk scoring", b:["Give every incident a number showing how urgent it is","Uses asset value, attack sophistication, data at risk","Gradient boosting tends to be most accurate","Learns from how past incidents turned out","Puts people on the biggest risks first","Re-scores as an incident develops"],
+    s:[[-1,"With thousands of alerts, the question is: which one first?"],
+       [0,"Risk scoring gives each incident a number, say from zero to one hundred, showing how urgent it is."],
+       [1,"The score is built from features: how valuable is the affected system, how advanced does the attack look, and how much data is exposed?"],
+       [2,"A method called gradient boosting, which builds many small decision trees that each correct the last one's mistakes, usually gives the most accurate scores."],
+       [3,"It learns from history: which past incidents actually turned out to be serious."],
+       [4,"So your scarce analysts work on the patient-records leak before the printer alert."],
+       [5,"And the score updates as the incident develops, moving up the queue if things get worse."]]},
+  { tag:"Worked example", t:"Where people stay in the loop", b:["Low risk, high confidence: automate fully","High risk or low confidence: automate the checks, ask a person to approve","Example: model flags a real supplier's bank change at score 64","Playbook gathers evidence, then pauses for a human decision","Every decision is logged for audit and future training"],
+    s:[[-1,"A common question is: should the machine ever act on its own? The honest answer is, it depends on the risk."],
+       [0,"For low-risk actions where the system is very confident, such as removing a known phishing email from mailboxes, full automation is sensible. Waiting for a person only gives the attacker more time."],
+       [1,"For high-impact actions, or when the model is unsure, a better pattern is to automate the evidence gathering and then pause for a person to approve the final step."],
+       [2,"Here's an example. A model flags nine emails from a long-standing supplier announcing new bank details. The score is sixty-four. That's above the threshold, but not by much."],
+       [3,"Blocking them automatically could stop real payments and damage a good relationship. So the playbook gathers the facts, shows the reviewer why the model was suspicious, and then waits. A person phones the supplier on a known number and confirms the change is genuine."],
+       [4,"Every decision, by machine or person, is logged. That record helps auditors, and it becomes training data so the model improves. That ends lesson three. On to the quiz."]]}
+  ],
+  quiz:[
+   {q:"Why do auditors like decision-tree response logic?",o:["It is the fastest method possible","Anyone can read and check how each decision was reached","It needs no data","It never changes"],a:1,w:"Decision trees are easy to read and audit. You can follow exactly why an action was chosen."},
+   {q:"In the phishing playbook, what comes straight after checking threat intelligence?",o:["Update filters","Scan attachments","Disable credentials","Extract headers"],a:1,w:"The order is: extract headers, check threat intelligence, scan attachments, quarantine emails, disable credentials, then update filters."},
+   {q:"In reinforcement learning, the ‘reward’ in incident response is based on…",o:["How many alerts were raised","How well the incident was contained","The analyst's salary","The number of servers"],a:1,w:"The agent is rewarded for containing incidents effectively, balanced against cost and disruption."},
+   {q:"What is the main purpose of ML risk scoring?",o:["To delete low-risk alerts","To put people's attention on the highest-risk incidents first","To replace playbooks","To encrypt incidents"],a:1,w:"Scoring ranks incidents by urgency, so limited staff deal with the biggest risks first."}
+  ]},
+{ title:"SOAR platforms in practice", slides:"Slides 17–22",
+  deck:[
+  { tag:"SOAR platforms", t:"What's inside a SOAR platform", b:["Case management: tracks each incident start to finish","Orchestration engine: runs the playbooks","Integrations: connect to other tools through APIs","Threat intelligence: adds outside context","Dashboards: show metrics and performance","Automation library: reusable actions and connectors"],
+    s:[[-1,"Welcome to lesson four. SOAR stands for security orchestration, automation and response. A SOAR platform is the control room that ties everything together."],
+       [0,"Case management tracks each incident from first alert to closure, like a ticket that records who did what and when."],
+       [1,"The orchestration engine runs the playbooks we met in lesson three."],
+       [2,"Integrations connect the SOAR platform to your other tools, such as the firewall, email system and endpoint protection, through APIs, which are standard ways for software to talk to software."],
+       [3,"Threat intelligence feeds bring in outside knowledge about known attackers and bad web addresses."],
+       [4,"Dashboards show how you're doing: how many incidents, how fast you resolve them, where the bottlenecks are."],
+       [5,"And an automation library holds ready-made actions you can reuse instead of building every step from scratch."]]},
+  { tag:"SOAR platforms", t:"Leading SOAR platforms", b:["Cortex XSOAR (Palo Alto): 700+ integrations","Splunk SOAR: deep links to Splunk's SIEM","IBM Security QRadar SOAR: enterprise scale, compliance","FortiSOAR: part of the Fortinet security fabric","Rapid7 InsightConnect: cloud-native, developer-friendly","Choose on integrations, ML features, scale and cost"],
+    s:[[-1,"Here are some of the best-known platforms. Product names and features change often, so always check the latest details."],
+       [0,"Cortex XSOAR from Palo Alto Networks is known for a very large library of integrations, over seven hundred."],
+       [1,"Splunk SOAR works closely with Splunk's SIEM, the system that collects and searches security logs."],
+       [2,"IBM's SOAR, originally called Resilient, is aimed at large organisations with heavy compliance needs."],
+       [3,"FortiSOAR fits naturally if you already use Fortinet firewalls and tools."],
+       [4,"Rapid7 InsightConnect is cloud-based and popular with teams who like to build their own automations."],
+       [5,"When choosing, look at four things: does it connect to the tools you already have, how good are its machine learning features, can it handle your volume, and what will it really cost."]]},
+  { tag:"Case study", t:"Financial services", b:["Global bank, 50,000+ transactions a day","ML detection plus SOAR orchestration","Time to resolve: 8 hours → 40 minutes (−92%)","False positives down 73%","85% of common incident types automated","Paid for itself in 8 months"],
+    s:[[-1,"Let's see this in practice, starting with a bank."],
+       [0,"This global bank processes more than fifty thousand transactions every day, so any delay in stopping fraud is expensive."],
+       [1,"It combined machine learning detection with a SOAR platform to orchestrate the response."],
+       [2,"The average time to resolve an incident fell from eight hours to forty minutes. That's a ninety-two per cent reduction."],
+       [3,"False alarms fell by seventy-three per cent, so analysts spent their time on real threats."],
+       [4,"Eighty-five per cent of the common incident types were handled automatically."],
+       [5,"And the savings paid for the whole project within eight months."]]},
+  { tag:"Case study", t:"Healthcare provider", b:["Regional health system, 40+ sites","Challenge: strict privacy rules and a small security team","Phased approach: automate step by step","Alert volume down 89%","Response time: 4 hours → 12 minutes","Compliance records produced automatically"],
+    s:[[-1,"Our second example is a regional healthcare provider."],
+       [0,"It runs more than forty facilities, from hospitals to clinics."],
+       [1,"It faced strict patient-privacy rules, in this case America's HIPAA law, the equivalent of UK GDPR for health data, and it had only a small security team."],
+       [2,"Rather than automating everything at once, it automated in phases. Simple, low-risk tasks first, then more as confidence grew."],
+       [3,"Alert volume dropped by eighty-nine per cent, because related alerts were grouped and false ones filtered out."],
+       [4,"Response time fell from four hours to twelve minutes."],
+       [5,"And because every action was logged automatically, the compliance paperwork was ready when auditors asked."]]},
+  { tag:"Putting it into practice", t:"Rolling out SOAR in phases", flow:["Phase 1 · Enrich","Phase 2 · Contain with approval","Phase 3 · Contain automatically","Phase 4 · Learn and expand"],
+    b:["Phase 1: automate evidence gathering only","Phase 2: suggest actions, a person approves","Phase 3: automate trusted, low-risk actions fully","Phase 4: measure, learn and add new playbooks","Track MTTR, false alarm rate and analyst hours saved"],
+    s:[[-1,"Both case studies point to the same lesson: don't switch everything on at once. Here's a simple four-phase plan any organisation can follow."],
+       [0,"In phase one, automate only the gathering of evidence. When an alert arrives, the platform looks up the web address, the device owner and the user's recent activity, and attaches it all to the case. Nothing is changed, so the risk is very low, but analysts save a lot of time straight away."],
+       [1,"In phase two, the platform suggests an action, such as isolating a laptop, and a person clicks to approve it. This builds trust, because the team can see how often the suggestion is right."],
+       [2,"In phase three, actions that have proved reliable, and are easy to undo, run automatically. Removing a phishing email from every mailbox is a good first candidate."],
+       [3,"In phase four, you measure, learn, and add new playbooks for other incident types."],
+       [4,"Throughout, track three numbers: the mean time to resolve, the false alarm rate, and the analyst hours saved. These numbers are what convince leaders to keep investing. They are exactly the figures our bank and healthcare examples reported. That's lesson four. Quiz time."]]}
+  ],
+  quiz:[
+   {q:"Which SOAR component actually runs the playbooks?",o:["Case management","The orchestration engine","The dashboard","Threat intelligence"],a:1,w:"The orchestration engine carries out the playbook steps in order and handles errors."},
+   {q:"What did the bank's time to resolve change from and to?",o:["4 hours → 12 minutes","8 hours → 40 minutes","2 days → 8 hours","40 minutes → 8 minutes"],a:1,w:"The bank cut mean time to resolve from eight hours to forty minutes, a 92% reduction. Four hours to twelve minutes was the healthcare provider."},
+   {q:"Why did the healthcare provider automate in phases?",o:["To delay spending","To reduce risk and build confidence step by step","Because SOAR can't do everything at once","Regulators banned automation"],a:1,w:"Starting with simple, low-risk tasks builds trust and limits the damage if an automation goes wrong."},
+   {q:"Which is NOT one of the four main criteria for choosing a SOAR platform?",o:["Integrations with your existing tools","Machine learning features","Logo colour","Scale and cost"],a:2,w:"Choose on integrations, ML capability, ability to scale, and true cost."}
+  ]},
+{ title:"Challenges and the road ahead", slides:"Slides 23–27",
+  deck:[
+  { tag:"Challenges", t:"Adversarial machine learning", b:["Attackers craft inputs to fool detection models","Example: tweak malware so the classifier misses it","Defences: adversarial training, diverse models, input checks","An ongoing arms race","Robust models are critical in security"],
+    s:[[-1,"Welcome to the final lesson: challenges and the road ahead."],
+       [0,"Machine learning has a weak spot. Attackers can study a model and craft inputs designed to fool it. This is called adversarial machine learning."],
+       [1,"For example, an attacker can make tiny changes to malware, adding harmless padding or renaming parts, until the classifier labels it safe, while it still works exactly as before."],
+       [2,"Defences include adversarial training, where you deliberately train the model on these tricked examples. Using several different models, so fooling one isn't enough. And checking inputs before the model sees them."],
+       [3,"It's an arms race. Each new defence prompts a new trick."],
+       [4,"So in security, a model has to be robust, not just accurate on a test set."]]},
+  { tag:"Challenges", t:"Explainability", b:["Teams need to understand why a model decided","Black-box models are hard to trust and audit","Tools: LIME, SHAP, attention maps","Trade-off between accuracy and clarity","Regulators increasingly expect transparency","Explanations build confidence with leaders"],
+    s:[[-1,"The next challenge is explainability."],
+       [0,"If a model says ‘isolate the finance server’, the security team needs to know why before they shut down payroll."],
+       [1,"Many powerful models are black boxes. They give an answer but no reasons, which makes them hard to trust and hard to audit."],
+       [2,"Explainable AI tools help. SHAP and LIME show which factors pushed the decision one way or the other, for example ‘lookalike domain: plus twenty-four points’. Attention maps show what a transformer focused on."],
+       [3,"There is a trade-off: the most accurate models are often the hardest to explain."],
+       [4,"Regulators increasingly expect automated decisions to be transparent. In the UK, data protection law gives people rights around automated decisions about them."],
+       [5,"And clear explanations are what win the confidence of managers and boards."]]},
+  { tag:"Challenges", t:"Cloud-native complexity", b:["Containers are short-lived, so evidence disappears","Microservices create tangled dependencies","Service mesh tools give visibility between services","Immutable infrastructure: replace rather than repair","Automation must work natively with Kubernetes","Needs specialised response techniques"],
+    s:[[-1,"Modern applications run in the cloud, and that changes incident response."],
+       [0,"Containers, the small packaged units that apps run in, may only live for minutes. If you delete one, the evidence goes with it. So capture a snapshot first."],
+       [1,"Applications are split into many small services, called microservices, that call each other. Tracing an attack through them is like following one thread in a tangled ball of wool."],
+       [2,"A service mesh adds a layer that watches traffic between services, which helps you spot an attacker moving sideways."],
+       [3,"The cloud also favours immutable infrastructure. Instead of patching a broken server, you throw it away and deploy a fresh, fixed one."],
+       [4,"So response automation must work natively with Kubernetes, the system that runs containers."],
+       [5,"In short, cloud incidents need their own specialised playbooks."]]},
+  { tag:"Summary", t:"Key takeaways", b:["AI automation is essential for modern security operations","Detection + orchestration + prioritisation work together","SOAR platforms bring these into one system","Phased roll-out reduces risk and builds confidence","Keep the right level of human oversight","Keep learning and adapting as threats change"],
+    s:[[-1,"Let's pull it all together."],
+       [0,"With today's alert volumes and attack speeds, AI-driven automation is no longer optional for a serious security team."],
+       [1,"The complete solution has three parts working together: machine learning to detect, orchestration to respond, and risk scoring to prioritise."],
+       [2,"SOAR platforms bring all three into one system."],
+       [3,"Roll automation out in phases: start simple, prove it works, then expand."],
+       [4,"Keep people in charge of high-impact decisions. Automation should speed people up, not leave them out."],
+       [5,"And keep learning. Attackers adapt, so your models and playbooks must too."]]},
+  { tag:"Worked example", t:"A crypto-miner learns to hide", b:["Day 1: miner spotted in a container, score 0.88","Team isolates, snapshots, rotates secrets, rebuilds","Day 3: new miner runs slowly across many containers","Model score 0.38, under the 0.50 alert line","Second signal: traffic to known mining servers","Fix: add diverse signals, retrain on the evasion"],
+    s:[[-1,"Let's finish with an example that brings the three challenges together."],
+       [0,"On day one, a monitoring model spots a cryptocurrency miner running inside a container in an online shop's checkout system. It scores the behaviour at zero point eight eight, well above the alert line."],
+       [1,"The team does everything right for a cloud-native incident. They isolate the container, take a snapshot for evidence, change every password and key it could reach, and rebuild it from a patched image rather than repairing it in place."],
+       [2,"On day three, the attacker is back, and smarter. This time the miner runs slowly, spread thinly across many containers, and timed to look like normal batch work."],
+       [3,"The model now scores it at zero point three eight, under the alert line. It has been deliberately fooled. That's adversarial machine learning in action."],
+       [4,"What catches it is a second, completely different signal: traffic going to known mining servers, picked up from threat intelligence, plus a twelve per cent jump in the cloud bill."],
+       [5,"The fix is to keep that second signal, retrain the model on the evasion examples, and use the explanation tools to check why the model was fooled. Thank you for watching. Complete the final quiz to finish the course."]]}
+  ],
+  quiz:[
+   {q:"What is adversarial machine learning?",o:["Two models competing in a game","Attackers deliberately crafting inputs to fool a model","Training a model on more data","A model that refuses to work"],a:1,w:"Attackers study a model and tweak their inputs, such as malware, so the model gets it wrong."},
+   {q:"Which of these is a defence against adversarial attacks?",o:["Using one model only","Adversarial training and using several different models","Turning off logging","Lowering every threshold to zero"],a:1,w:"Training on tricked examples and using diverse models makes it much harder to fool the system."},
+   {q:"Why should you snapshot a compromised container before deleting it?",o:["Containers are expensive","Containers are short-lived, so evidence disappears when they're deleted","Kubernetes requires it","Snapshots fix the vulnerability"],a:1,w:"Containers are ephemeral. Capture the evidence first, then isolate and replace."},
+   {q:"What do SHAP and LIME help with?",o:["Speeding up networks","Explaining which factors drove a model's decision","Encrypting data","Writing playbooks"],a:1,w:"They are explainability tools. They show which features pushed a model's decision up or down."}
+  ]}
+];
+
+/* ---------------- presenter SVG (original character) ---------------- */
+var PRESENTER='<svg viewBox="0 0 200 260" role="img" aria-label="Animated presenter">'+
+ '<g class="body">'+
+  '<path d="M30 260 C34 205 60 182 100 180 C140 182 166 205 170 260 Z" fill="var(--jacket)"/>'+
+  '<path d="M84 182 L100 214 L116 182 Z" fill="var(--shirt)"/>'+
+  '<path d="M96 192 L100 216 L104 192 L100 188 Z" fill="var(--stage-hi)"/>'+
+  '<path d="M84 182 L94 230 L76 190 Z M116 182 L106 230 L124 190 Z" fill="rgba(0,0,0,.18)"/>'+
+  '<g class="armL"><path d="M50 200 C40 222 42 245 46 260 L70 260 C66 240 66 222 70 206 Z" fill="var(--jacket)"/></g>'+
+  '<g class="armR" id="armR"><path d="M138 168 C156 176 168 196 170 226 L150 230 C148 208 140 194 128 186 Z" fill="var(--jacket)"/>'+
+   '<circle cx="160" cy="232" r="10" fill="var(--skin)"/></g>'+
+ '</g>'+
+ '<rect x="90" y="150" width="20" height="34" rx="8" fill="var(--skin-dk)"/>'+
+ '<g class="headg" id="headg">'+
+  '<ellipse cx="62" cy="104" rx="7" ry="11" fill="var(--skin-dk)"/><ellipse cx="138" cy="104" rx="7" ry="11" fill="var(--skin-dk)"/>'+
+  '<ellipse cx="100" cy="100" rx="38" ry="48" fill="var(--skin)"/>'+
+  '<path d="M60 96 C56 58 78 44 102 44 C130 44 146 62 140 96 C136 80 128 70 112 66 C98 74 76 74 64 80 Z" fill="var(--hair)"/>'+
+  '<path d="M76 84 Q86 78 94 84 M106 84 Q114 78 124 84" stroke="var(--hair)" stroke-width="3.5" fill="none" stroke-linecap="round"/>'+
+  '<g class="eyes" id="eyes"><ellipse cx="85" cy="96" rx="4.2" ry="5" fill="#1a1a1a"/><ellipse cx="115" cy="96" rx="4.2" ry="5" fill="#1a1a1a"/>'+
+   '<circle cx="86.5" cy="94.5" r="1.3" fill="#fff"/><circle cx="116.5" cy="94.5" r="1.3" fill="#fff"/></g>'+
+  '<path d="M100 100 Q96 114 100 116 Q103 117 105 115" stroke="var(--skin-dk)" stroke-width="2.5" fill="none" stroke-linecap="round"/>'+
+  '<g id="mouthA"><path d="M88 128 Q100 134 112 128" stroke="#6b2f24" stroke-width="3" fill="none" stroke-linecap="round"/></g>'+
+  '<g id="mouthB" visibility="hidden"><ellipse cx="100" cy="129" rx="9" ry="4.5" fill="#5a2219"/><path d="M92 127 Q100 125 108 127" stroke="#fff" stroke-width="2" fill="none"/></g>'+
+  '<g id="mouthC" visibility="hidden"><ellipse cx="100" cy="130" rx="11" ry="7.5" fill="#5a2219"/><path d="M90 126 Q100 123 110 126" stroke="#fff" stroke-width="2.5" fill="none"/><ellipse cx="100" cy="134" rx="6" ry="2.5" fill="#c4574a"/></g>'+
+ '</g></svg>';
+
+/* ---------------- state ---------------- */
+var S={L:0,slide:0,seg:0,sent:0,playing:false,voiceOn:true,captions:true,rate:1,voice:null,timer:null,mouthT:null,quiz:false,qi:0,answers:[],
+       results:LESSONS.map(function(){return {watched:false,score:null}})};
+var SYN=("speechSynthesis" in window)?window.speechSynthesis:null;
+try{var saved=JSON.parse(localStorage.getItem("irlesson-progress")||"null");if(saved&&saved.length===LESSONS.length)S.results=saved}catch(e){}
+function save(){try{localStorage.setItem("irlesson-progress",JSON.stringify(S.results))}catch(e){}}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function el(h){var d=document.createElement("div");d.innerHTML=h.trim();return d.firstChild}
+function sentences(t){return t.match(/[^.!?]+[.!?]+["’”]?|[^.!?]+$/g).map(function(x){return x.trim()}).filter(Boolean)}
+function words(t){return t.split(/\s+/).length}
+/* flatten a lesson into a list of {slide, bullet, text} sentences */
+function plan(L){var out=[];LESSONS[L].deck.forEach(function(sl,si){sl.s.forEach(function(seg,gi){sentences(seg[1]).forEach(function(tx,k){out.push({slide:si,bullet:seg[0],first:k===0,seg:gi,text:tx})})})});return out}
+function lessonSecs(L){return Math.round(plan(L).reduce(function(a,x){return a+words(x.text)},0)/2.55)}
+function fmt(s){s=Math.max(0,Math.round(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
+var PLAN=plan(0), POS=0;
+
+/* ---------------- voices ---------------- */
+var VOICES=[];
+function loadVoices(){ if(!SYN)return; VOICES=SYN.getVoices().filter(function(v){return /^en/i.test(v.lang)});
+  if(!S.voice){ var pref=VOICES.filter(function(v){return /en[-_]GB/i.test(v.lang)}); S.voice=(pref.filter(function(v){return /natural|online|google/i.test(v.name)})[0]||pref[0]||VOICES[0]||null); }
+  var sel=document.getElementById("voice"); if(sel){ fillVoices(sel) } }
+if(SYN){ loadVoices(); SYN.onvoiceschanged=loadVoices; }
+function fillVoices(sel){ sel.innerHTML=VOICES.length?VOICES.map(function(v,i){return '<option value="'+i+'"'+(S.voice===v?" selected":"")+'>'+esc(v.name.replace(/Microsoft |Google /,""))+' ('+v.lang+')</option>'}).join(""):'<option>Default voice</option>' }
+
+/* ---------------- rail ---------------- */
+function renderRail(){
+  var r=document.getElementById("rail");r.innerHTML="";
+  LESSONS.forEach(function(ls,i){
+    var res=S.results[i], st=res.score!=null?("Quiz "+res.score+"%"):res.watched?"Watched":fmt(lessonSecs(i))+" · "+ls.slides;
+    var b=el('<button class="lesson-btn'+(i===S.L?" on":"")+(res.score!=null&&res.score>=CFG.passMark?" done":"")+'" type="button"><span class="n">'+(res.score!=null&&res.score>=CFG.passMark?"✓":i+1)+'</span><span><b>'+esc(ls.title)+'</b><small>'+st+'</small></span></button>');
+    b.addEventListener("click",function(){openLesson(i)});r.appendChild(b);
+  });
+  var done=S.results.filter(function(x){return x.score!=null&&x.score>=CFG.passMark}).length;
+  r.appendChild(el('<p class="total">'+done+' of '+LESSONS.length+' lessons passed · pass mark '+CFG.passMark+'%</p>'));
+}
+
+/* ---------------- player ---------------- */
+function renderPlayer(){
+  var p=document.getElementById("player");p.innerHTML="";
+  if(S.quiz){renderQuiz(p);return}
+  var ls=LESSONS[S.L];
+  p.appendChild(el('<div class="stage" id="stage"><div class="slide" id="slide"></div><div class="presenter">'+PRESENTER+'<span class="name">Your instructor</span></div></div>'));
+  p.appendChild(el('<div class="captions" id="cap" aria-live="polite"'+(S.captions?"":" hidden")+'></div>'));
+  var t=el('<div class="transport"><div class="prog"><span id="bar"></span></div><div class="ctrls">'+
+   '<div class="grp"><button class="icon-btn" type="button" id="prev" aria-label="Previous slide">◀ Slide</button><button class="icon-btn primary" type="button" id="play">▶ Play</button><button class="icon-btn" type="button" id="next" aria-label="Next slide">Slide ▶</button><span class="time" id="time"></span></div>'+
+   '<div class="grp"><label class="chk"><input type="checkbox" id="vo" '+(S.voiceOn?"checked":"")+'> Voice</label><label class="chk"><input type="checkbox" id="cc" '+(S.captions?"checked":"")+'> Captions</label>'+
+   '<select id="rate" aria-label="Speed"><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.15">1.15×</option><option value="1.3">1.3×</option></select>'+
+   '<select id="voice" aria-label="Voice"></select><button class="icon-btn" type="button" id="toquiz">Skip to quiz</button></div></div>'+
+   '<p class="notice" id="notice">Lesson '+(S.L+1)+' of '+LESSONS.length+' · '+esc(ls.slides)+' · about '+fmt(lessonSecs(S.L))+' minutes. The voice comes from your browser, so it may sound different on each device.</p></div>');
+  p.appendChild(t);
+  document.getElementById("rate").value=String(S.rate);
+  fillVoices(document.getElementById("voice"));
+  if(!SYN){document.getElementById("vo").checked=false;document.getElementById("vo").disabled=true;S.voiceOn=false;document.getElementById("notice").textContent="This browser has no built-in voice, so the lesson plays with captions only."}
+  document.getElementById("play").addEventListener("click",toggle);
+  document.getElementById("prev").addEventListener("click",function(){jumpSlide(-1)});
+  document.getElementById("next").addEventListener("click",function(){jumpSlide(1)});
+  document.getElementById("vo").addEventListener("change",function(e){S.voiceOn=e.target.checked;restartSentence()});
+  document.getElementById("cc").addEventListener("change",function(e){S.captions=e.target.checked;document.getElementById("cap").hidden=!S.captions});
+  document.getElementById("rate").addEventListener("change",function(e){S.rate=+e.target.value;restartSentence()});
+  document.getElementById("voice").addEventListener("change",function(e){S.voice=VOICES[+e.target.value]||null;restartSentence()});
+  document.getElementById("toquiz").addEventListener("click",startQuiz);
+  drawSlide(PLAN[POS]?PLAN[POS].slide:0, POS);
+  setCaption(PLAN[POS]?PLAN[POS].text:"");
+  updateTime();
+}
+function drawSlide(si,pos){
+  var sl=LESSONS[S.L].deck[si], box=document.getElementById("slide"); if(!box)return;
+  var shown=-1; for(var k=0;k<=pos&&k<PLAN.length;k++){ if(PLAN[k].slide===si&&PLAN[k].bullet>shown)shown=PLAN[k].bullet }
+  var cur=PLAN[pos]&&PLAN[pos].slide===si?PLAN[pos].bullet:-1;
+  box.innerHTML='<p class="tag">'+esc(sl.tag)+' · '+(si+1)+'/'+LESSONS[S.L].deck.length+'</p><h2>'+esc(sl.t)+'</h2>'+
+    (sl.flow?'<div class="flow">'+sl.flow.map(function(f,i){return '<span class="'+((sl.b.length===sl.flow.length?i<=shown:shown>=1)?"on":"")+'">'+esc(f)+'</span>'}).join("")+'</div>':'')+
+    '<ul>'+sl.b.map(function(b,i){return '<li class="'+(i<=shown?"shown":"")+(i===cur?" now":"")+'">'+esc(b)+'</li>'}).join("")+'</ul>';
+}
+function setCaption(t){var c=document.getElementById("cap");if(c)c.textContent=t}
+function updateTime(){
+  var done=0,total=0;PLAN.forEach(function(x,i){var w=words(x.text);total+=w;if(i<POS)done+=w});
+  var b=document.getElementById("bar");if(b)b.style.width=(PLAN.length?POS/PLAN.length*100:0)+"%";
+  var t=document.getElementById("time");if(t)t.textContent=fmt(done/2.55/S.rate)+" / "+fmt(total/2.55/S.rate);
+}
+function setPlayBtn(){var b=document.getElementById("play");if(b)b.textContent=S.playing?"❚❚ Pause":(POS>=PLAN.length?"↺ Replay":POS>0?"▶ Resume":"▶ Play")}
+
+/* ---------------- playback ---------------- */
+function toggle(){ if(S.playing){pause()}else{ if(POS>=PLAN.length)POS=0; S.playing=true; setPlayBtn(); speakCurrent(); } }
+function pause(){S.playing=false;clearTimeout(S.timer);if(SYN)SYN.cancel();mouth(false);setPlayBtn()}
+function restartSentence(){ if(S.playing){ clearTimeout(S.timer); if(SYN)SYN.cancel(); speakCurrent(); } }
+var TOKEN=0;
+function speakCurrent(){
+  var my=++TOKEN;
+  if(POS>=PLAN.length){ finishLesson(); return }
+  var it=PLAN[POS]; drawSlide(it.slide,POS); setCaption(it.text); updateTime();
+  if(it.first&&it.bullet>=0)gesture();
+  var done=function(){ if(my!==TOKEN||!S.playing)return; mouth(false); POS++; S.timer=setTimeout(function(){ if(my===TOKEN&&S.playing)speakCurrent() }, PLAN[POS]&&PLAN[POS].slide!==it.slide?700:180) };
+  mouth(true);
+  if(S.voiceOn&&SYN){
+    SYN.cancel();
+    var u=new SpeechSynthesisUtterance(it.text.replace(/–/g," to ").replace(/→/g," to ").replace(/\+/g," plus "));
+    if(S.voice)u.voice=S.voice; u.lang=S.voice?S.voice.lang:"en-GB"; u.rate=S.rate;
+    u.onend=done; u.onerror=function(){ if(my===TOKEN&&S.playing){ S.timer=setTimeout(done, words(it.text)/2.55/S.rate*1000) } };
+    u.onboundary=function(){ flap() };
+    SYN.speak(u);
+    /* safety net: some browsers never fire onend */
+    var guard=Math.max(4000,words(it.text)/1.6/S.rate*1000+2500);
+    S.timer=setTimeout(function(){ if(my===TOKEN&&S.playing){ SYN.cancel(); done() } },guard);
+  } else {
+    S.timer=setTimeout(done,Math.max(1800,words(it.text)/2.55/S.rate*1000));
+  }
+}
+function jumpSlide(d){
+  var cur=PLAN[Math.min(POS,PLAN.length-1)].slide, target=Math.max(0,Math.min(LESSONS[S.L].deck.length-1,cur+d));
+  for(var k=0;k<PLAN.length;k++){ if(PLAN[k].slide===target){POS=k;break} }
+  if(S.playing){ clearTimeout(S.timer); if(SYN)SYN.cancel(); speakCurrent() } else { drawSlide(target,POS); setCaption(PLAN[POS].text); updateTime(); setPlayBtn() }
+}
+function finishLesson(){
+  S.playing=false; mouth(false); S.results[S.L].watched=true; save(); setPlayBtn(); updateTime();
+  var b=document.getElementById("bar"); if(b)b.style.width="100%";
+  setCaption("End of lesson "+(S.L+1)+". Starting your quiz…"); renderRail();
+  S.timer=setTimeout(startQuiz,1600);
+}
+
+/* ---------------- presenter animation ---------------- */
+var MOUTHS=["mouthA","mouthB","mouthC"];
+function showMouth(i){MOUTHS.forEach(function(id,k){var m=document.getElementById(id);if(m)m.setAttribute("visibility",k===i?"visible":"hidden")})}
+function flap(){showMouth(1+Math.floor(Math.random()*2))}
+function mouth(on){ clearInterval(S.mouthT); if(on){ S.mouthT=setInterval(function(){ var r=Math.random(); showMouth(r<.3?0:r<.7?1:2) },120) } else showMouth(0) }
+function gesture(){var a=document.getElementById("armR"),h=document.getElementById("headg");if(!a)return;a.classList.add("point");h&&h.classList.add("tilt");setTimeout(function(){a.classList.remove("point");h&&h.classList.remove("tilt")},1300)}
+setInterval(function(){var e=document.getElementById("eyes");if(!e)return;e.classList.add("blink");setTimeout(function(){e.classList.remove("blink")},140)},3800);
+
+/* ---------------- quiz ---------------- */
+function startQuiz(){ pause(); S.quiz=true; S.qi=0; S.answers=[]; renderPlayer(); }
+function renderQuiz(p){
+  var ls=LESSONS[S.L], qz=ls.quiz;
+  if(S.qi>=qz.length){ return renderScore(p) }
+  var q=qz[S.qi], ans=S.answers[S.qi];
+  var box=el('<section class="quiz" aria-live="polite"><div class="row"><div><p class="eyebrow">Lesson '+(S.L+1)+' quiz · question '+(S.qi+1)+' of '+qz.length+'</p><h2>'+esc(ls.title)+'</h2></div><div class="dots">'+qz.map(function(_,i){var a=S.answers[i];return '<i class="'+(a==null?(i===S.qi?"c":""):a===qz[i].a?"r":"w")+'"></i>'}).join("")+'</div></div>'+
+   '<div class="qcard"><p class="qt">'+esc(q.q)+'</p><div class="qopts" style="display:flex;flex-direction:column;gap:8px"></div></div></section>');
+  q.o.forEach(function(o,i){
+    var b=el('<button class="qopt" type="button"><span class="k">'+"ABCD"[i]+'</span><span>'+esc(o)+'</span></button>');
+    if(ans!=null){ b.disabled=true; if(i===q.a)b.classList.add("right"); else if(i===ans)b.classList.add("wrong") }
+    else b.addEventListener("click",function(){S.answers[S.qi]=i;renderPlayer()});
+    box.querySelector(".qopts").appendChild(b);
+  });
+  if(ans!=null){
+    box.appendChild(el('<p class="why"><b>'+(ans===q.a?"Correct.":"Not quite.")+'</b> '+esc(q.w)+'</p>'));
+    var n=el('<div class="row"><span></span><button class="btn" type="button">'+(S.qi===qz.length-1?"See my score":"Next question")+'</button></div>');
+    n.querySelector("button").addEventListener("click",function(){S.qi++;renderPlayer()});box.appendChild(n);
+  }
+  p.appendChild(box);
+}
+function renderScore(p){
+  var qz=LESSONS[S.L].quiz, right=S.answers.filter(function(a,i){return a===qz[i].a}).length, pct=Math.round(right/qz.length*100), pass=pct>=CFG.passMark;
+  var best=S.results[S.L].score; S.results[S.L].score=best==null?pct:Math.max(best,pct); save(); renderRail();
+  var rec={type:"irlesson-result",course:"Chapter 15: Automated Incident Response",organisation:CFG.orgName||null,lesson:S.L+1,lessonTitle:LESSONS[S.L].title,scorePercent:pct,passMark:CFG.passMark,passed:pass,
+    lessonsPassed:S.results.filter(function(x){return x.score!=null&&x.score>=CFG.passMark}).length,totalLessons:LESSONS.length,completedAt:new Date().toISOString()};
+  try{ if(window.parent&&window.parent!==window)window.parent.postMessage(rec,CFG.postMessageOrigin) }catch(e){}
+  var last=S.L===LESSONS.length-1, allDone=rec.lessonsPassed===LESSONS.length;
+  var box=el('<section class="quiz"><p class="eyebrow">Lesson '+(S.L+1)+' result</p><p class="result" style="color:var(--'+(pass?"ok":"crit")+')">'+right+' of '+qz.length+' correct · '+pct+'%</p>'+
+    '<p>'+(pass?(allDone?"Well done. You've passed every lesson in this chapter.":"Passed. You're ready for the next lesson."):"Below the "+CFG.passMark+"% pass mark. Re-watch the lesson, then try the quiz again.")+'</p>'+
+    '<div class="row" style="justify-content:flex-start"></div>'+(allDone?'<p class="eyebrow">Completion record</p><pre class="record">'+esc(JSON.stringify({course:rec.course,organisation:rec.organisation,lessons:S.results.map(function(r,i){return {lesson:i+1,score:r.score}}),completedAt:rec.completedAt},null,2))+'</pre>':'')+'</section>');
+  var row=box.querySelector(".row");
+  var again=el('<button class="btn ghost" type="button">'+(pass?"Re-watch lesson":"Re-watch and retry")+'</button>');again.addEventListener("click",function(){openLesson(S.L)});row.appendChild(again);
+  var retry=el('<button class="btn ghost" type="button">Retry quiz</button>');retry.addEventListener("click",startQuiz);row.appendChild(retry);
+  if(!last){var nx=el('<button class="btn" type="button">Next lesson ▶</button>');nx.addEventListener("click",function(){openLesson(S.L+1)});row.appendChild(nx)}
+  p.appendChild(box);
+}
+
+/* ---------------- navigation ---------------- */
+function openLesson(i){ pause(); TOKEN++; S.L=i; S.quiz=false; PLAN=plan(i); POS=0; renderRail(); renderPlayer(); }
+renderRail(); renderPlayer();
+</script>
+
+</body>
+</html>
