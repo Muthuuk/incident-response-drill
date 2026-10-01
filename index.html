@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident Response Drill Room</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an operations console — status strip on top, alert log | decision desk | risk & impact gauges below it; stacks to one column on phones */
+:root{
+  --bg:#EDF0F3; --panel:#FFFFFF; --sunk:#E3E8ED; --ink:#17202B; --muted:#5A6676; --line:#CBD3DC;
+  --accent:#0B5D7A; --accent-ink:#FFFFFF; --accent-soft:#D6E8EF;
+  --crit:#B42318; --crit-soft:#FBE4E1; --warn:#A35A00; --warn-soft:#FCEBD2; --ok:#1D7A46; --ok-soft:#DDF1E5;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",Consolas,"Liberation Mono",Menlo,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151C; --panel:#18202A; --sunk:#0C1117; --ink:#E4E9EF; --muted:#9AA6B4; --line:#2B3644;
+  --accent:#5FB3D3; --accent-ink:#0A1A22; --accent-soft:#16323F;
+  --crit:#F28B82; --crit-soft:#3A1C1A; --warn:#F2B35E; --warn-soft:#3A2A14; --ok:#6CCB93; --ok-soft:#163323;
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#10151C; --panel:#18202A; --sunk:#0C1117; --ink:#E4E9EF; --muted:#9AA6B4; --line:#2B3644;
+  --accent:#5FB3D3; --accent-ink:#0A1A22; --accent-soft:#16323F;
+  --crit:#F28B82; --crit-soft:#3A1C1A; --warn:#F2B35E; --warn-soft:#3A2A14; --ok:#6CCB93; --ok-soft:#163323;
+  color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:16px 40px;margin:0}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(1.6rem,3.2vw,2.3rem);font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.25rem;font-weight:600}
+h3{font-size:1rem;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:.6rem 1.1rem;border-radius:var(--r);font-weight:600}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input[type=text]{font:inherit;padding:.55rem .7rem;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);color:var(--ink);width:100%}
+label{font-weight:600;font-size:.9rem}
+
+/* ---------- start screen ---------- */
+.intro{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;align-items:start}
+.intro .lede{max-width:62ch;color:var(--muted);margin-top:10px}
+.lifecycle{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px;padding:0;list-style:none}
+.lifecycle li{font-family:var(--f-mono);font-size:.75rem;padding:.25rem .55rem;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:var(--panel)}
+.setup{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px}
+.mode{display:flex;flex-direction:column;gap:8px}
+.mode label.opt{display:flex;gap:10px;align-items:flex-start;font-weight:400;border:1px solid var(--line);border-radius:var(--r);padding:10px;cursor:pointer}
+.mode label.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.mode b{font-family:var(--f-display);font-weight:600}
+.mode small{display:block;color:var(--muted)}
+.scen-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.scen{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;text-align:left;color:var(--ink)}
+.scen:hover{border-color:var(--accent)}
+.scen .meta{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-family:var(--f-mono);font-size:.7rem;padding:.15rem .45rem;border-radius:4px;background:var(--sunk);color:var(--muted)}
+.scen p{color:var(--muted);font-size:.92rem}
+.scen .go{margin-top:auto;font-weight:600;color:var(--accent)}
+
+/* ---------- console ---------- */
+.strip{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between}
+.strip .who{min-width:0}
+.clock{display:flex;gap:18px;flex-wrap:wrap}
+.clock div{display:flex;flex-direction:column}
+.clock .v{font-family:var(--f-mono);font-size:1.15rem;font-variant-numeric:tabular-nums}
+.stages{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;list-style:none;padding:0;margin:0}
+.stages li{font-family:var(--f-mono);font-size:.7rem;padding:.45rem .4rem;border-top:4px solid var(--line);color:var(--muted)}
+.stages li.done{border-color:var(--ok);color:var(--ink)}
+.stages li.now{border-color:var(--accent);color:var(--ink);font-weight:500}
+.console{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr) minmax(0,1fr);gap:16px;align-items:start}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:560px;overflow:auto}
+.feed li{font-family:var(--f-mono);font-size:.76rem;line-height:1.45;padding:6px 8px;border-left:4px solid var(--line);background:var(--sunk);border-radius:0 4px 4px 0;overflow-wrap:anywhere}
+.feed li .t{color:var(--muted)}
+.feed li .s{font-weight:500}
+.feed li.crit{border-color:var(--crit)} .feed li.warn{border-color:var(--warn)} .feed li.ok{border-color:var(--ok)} .feed li.info{border-color:var(--accent)}
+.feed li.new{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:var(--accent-soft)}to{background:var(--sunk)}}
+.desk .situation{font-size:1rem;max-width:68ch}
+.desk .q{font-family:var(--f-display);font-size:1.15rem;font-weight:600}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt-btn{display:flex;gap:10px;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:var(--r);padding:10px 12px;align-items:flex-start}
+.opt-btn:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
+.opt-btn .k{font-family:var(--f-mono);font-weight:500;min-width:1.4em;color:var(--accent)}
+.opt-btn .auto{display:inline-block;margin-left:6px;font-family:var(--f-mono);font-size:.68rem;padding:.05rem .35rem;border-radius:3px;background:var(--accent-soft);color:var(--accent);vertical-align:middle}
+.opt-btn.picked.best{border-color:var(--ok);background:var(--ok-soft)}
+.opt-btn.picked.ok{border-color:var(--warn);background:var(--warn-soft)}
+.opt-btn.picked.poor{border-color:var(--crit);background:var(--crit-soft)}
+.opt-btn.reveal{border-style:dashed;border-color:var(--ok)}
+.feedback{border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.feedback.best{background:var(--ok-soft)} .feedback.ok{background:var(--warn-soft)} .feedback.poor{background:var(--crit-soft)}
+.verdict{font-family:var(--f-display);font-weight:700;font-size:1.05rem}
+.feedback.best .verdict{color:var(--ok)} .feedback.ok .verdict{color:var(--warn)} .feedback.poor .verdict{color:var(--crit)}
+.principle{font-size:.88rem;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.gauge{display:flex;flex-direction:column;gap:4px}
+.gauge .lbl{display:flex;justify-content:space-between;font-size:.85rem}
+.bar{height:10px;background:var(--sunk);border-radius:5px;overflow:hidden}
+.bar span{display:block;height:100%;border-radius:5px;transition:width .5s ease}
+.score-big{font-family:var(--f-display);font-size:2.4rem;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.shap{display:flex;flex-direction:column;gap:5px}
+.shap .f{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 3.2em;gap:6px;align-items:center;font-size:.8rem}
+.shap .track{height:8px;position:relative;background:var(--sunk);border-radius:4px}
+.shap .track i{position:absolute;top:0;height:100%;border-radius:4px}
+.shap .track .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.shap .n{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:.8rem;color:var(--muted)}
+.pill{display:inline-block;font-family:var(--f-mono);font-size:.72rem;padding:.12rem .5rem;border-radius:999px}
+.pill.crit{background:var(--crit-soft);color:var(--crit)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.ok{background:var(--ok-soft);color:var(--ok)}
+
+/* ---------- debrief ---------- */
+.debrief-top{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.stat .v{font-family:var(--f-display);font-size:1.8rem;font-weight:700;font-variant-numeric:tabular-nums}
+.review{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.review li{background:var(--panel);border:1px solid var(--line);border-left-width:5px;border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.review li.best{border-left-color:var(--ok)} .review li.ok{border-left-color:var(--warn)} .review li.poor{border-left-color:var(--crit)}
+.record{font-family:var(--f-mono);font-size:.75rem;background:var(--sunk);border:1px solid var(--line);border-radius:var(--r);padding:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto}
+
+@media (max-width:980px){
+  .console{grid-template-columns:minmax(0,1fr)}
+  .console .desk{order:-1}
+  .intro{grid-template-columns:minmax(0,1fr)}
+  .scen-grid{grid-template-columns:minmax(0,1fr)}
+  .debrief-top{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .feed{max-height:300px}
+}
+@media (max-width:560px){ .stages{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+/* =====================================================================
+   Incident Response Drill Room — self-contained training simulation
+   Portal set-up: before this script runs, a host page may define
+     window.IRSIM_CONFIG = { orgName:"Your organisation", passMark:70,
+                             postMessageOrigin:"https://portal.example.org" }
+   On completion the page posts {type:"irsim-result", ...record} to the
+   parent window (when embedded in an iframe) so the portal can record it.
+   ===================================================================== */
+var CFG = Object.assign({orgName:"", passMark:70, postMessageOrigin:"*"}, window.IRSIM_CONFIG||{});
+var STAGES = ["Preparation","Detection & analysis","Containment","Eradication","Recovery","Post-incident"];
+
+/* quality: best = 10 pts, ok = 5 pts, poor = 0 pts
+   mins = minutes this action takes by hand; auto = minutes with SOAR playbooks (if automatable)
+   imp / exp = change to business disruption and data exposure (0–100 scale) */
+var SCENARIOS = [
+{ id:"phish", title:"Invoice phish at Harbour Finance", sector:"Financial services", start:"09:12",
+  blurb:"A fake ‘overdue invoice’ email reaches the finance team and one clerk types their password into a lookalike login page.",
+  skills:["Phishing playbook","Account takeover","False positives"],
+  steps:[
+  { stage:1, title:"A credential-phishing alert",
+    events:[["09:06","Email gateway","14 copies of “Overdue invoice INV-20931” delivered to finance mailboxes","warn"],
+            ["09:09","Web proxy","accounts.clerk@harbour visited micros0ft-secure-login.co and submitted a form","crit"],
+            ["09:12","SIEM","Incident #4471 opened · category: credential phishing","info"]],
+    risk:{model:"Gradient-boosted risk scorer",score:82,features:[["Lookalike sender domain",24],["Login form on linked page",21],["Sent to finance staff",15],["Domain registered 2 days ago",12],["Sent during working hours",-3]]},
+    situation:"The email system and web proxy agree: a clerk in accounts payable entered their Microsoft 365 password on a fake login page six minutes ago. Thirteen colleagues received the same email.",
+    q:"What do you do first?",
+    opts:[
+     {t:"Run the phishing playbook: extract the email headers, check the link against threat intelligence, and search every mailbox for copies.",q:"best",mins:25,auto:4,imp:0,exp:0,
+      fb:"Right first move. You confirm the threat and learn how far it reached before you change anything. With a playbook these checks run in parallel in minutes.",
+      after:[["09:16","Threat intel","Link matches a known credential-harvesting kit (seen 3 days ago)","crit"]]},
+     {t:"Email all staff telling them not to open invoice emails.",q:"ok",mins:15,imp:5,exp:5,
+      fb:"A warning helps, but it doesn't tell you who already clicked, and the stolen password is still being used. Find out the facts first, then warn people."},
+     {t:"Close the alert. Only one person clicked, so the risk is small.",q:"poor",mins:1,imp:10,exp:25,
+      fb:"One stolen password is all an attacker needs to get into the mailbox and start invoice fraud. A high-scoring credential alert must never be closed without checking it.",
+      after:[["09:31","Identity","Sign-in to accounts.clerk from an unfamiliar location","crit"]]},
+     {t:"Wipe and re-image the clerk's laptop straight away.",q:"poor",mins:60,imp:10,exp:10,
+      fb:"The laptop isn't the problem. The password is. Wiping it destroys evidence and leaves the stolen password working."}
+    ]},
+  { stage:2, title:"The attacker is in the mailbox",
+    events:[["09:18","Identity","accounts.clerk signed in from a new country using a session token","crit"],
+            ["09:19","Mailbox audit","New inbox rule: forward messages containing “invoice” or “payment” to an external Gmail address","crit"]],
+    risk:{model:"Gradient-boosted risk scorer",score:94,features:[["Impossible-travel sign-in",28],["External forwarding rule created",26],["Finance mailbox",16],["Active session token",14],["Device previously known",-4]]},
+    situation:"Sign-in logs show the attacker is using the clerk's account right now. They have set a rule that quietly forwards invoice and payment emails outside the company.",
+    q:"How do you contain the account?",
+    opts:[
+     {t:"Revoke all sign-in sessions, reset the password, require multi-factor re-registration and delete the forwarding rule.",q:"best",mins:20,auto:2,imp:5,exp:0,
+      fb:"Complete containment. Resetting the password alone doesn't end sessions that are already open, and the rule would keep forwarding mail. This is a classic step to automate.",
+      after:[["09:21","Identity","All sessions revoked · MFA re-registration enforced · forwarding rule removed","ok"]]},
+     {t:"Reset the password only.",q:"ok",mins:5,imp:0,exp:15,
+      fb:"Partly right. The attacker's existing session token keeps working for a while, and the forwarding rule keeps sending mail out until someone deletes it.",
+      after:[["09:40","Mailbox audit","3 more emails forwarded by the inbox rule","warn"]]},
+     {t:"Leave the account active and watch what the attacker does next.",q:"poor",mins:0,imp:5,exp:30,
+      fb:"Watching an attacker can be useful in some cases, but not when live payment emails are leaving the company. Stopping the harm comes first."},
+     {t:"Block sign-ins from that country at the firewall.",q:"poor",mins:15,imp:5,exp:20,
+      fb:"Attackers can switch to a VPN in another country in seconds. This doesn't remove the session, the password or the rule."}
+    ]},
+  { stage:2, title:"Who else was hit?",
+    events:[["09:24","Mailbox search","14 copies found · 3 opened · 1 password submitted (proxy logs)","info"]],
+    situation:"The search shows 14 copies in 14 mailboxes. Three people opened the email, but proxy logs show only the clerk submitted a password.",
+    q:"What do you do about the other copies?",
+    opts:[
+     {t:"Pull every copy out of all mailboxes, block the sender domain and link, and check the two other people who opened it.",q:"best",mins:30,auto:3,imp:0,exp:0,
+      fb:"Fast, complete and consistent. This is what a playbook does well: the same steps every time, across every mailbox.",
+      after:[["09:27","Email gateway","14 messages quarantined · domain and URL blocked","ok"]]},
+     {t:"Ask staff to find and delete the email themselves.",q:"poor",mins:10,imp:5,exp:10,
+      fb:"People miss emails, open them by mistake, or forward them to ask whether they're safe. Removing them centrally is quicker and more reliable."},
+     {t:"Block all incoming external email for the day.",q:"poor",mins:5,imp:35,exp:0,
+      fb:"Far too broad. A finance team that can't receive email can't work, and this causes more harm than the threat itself."}
+    ]},
+  { stage:3, title:"The model flags a real supplier",
+    events:[["10:05","ML filter","9 messages held as ‘likely phishing’ · scores 61–68","warn"]],
+    risk:{model:"Phishing classifier (new threshold 60)",score:64,features:[["Mentions changed bank details",18],["New reply-to address",14],["Sender seen for 3 years",-16],["Passes SPF and DKIM checks",-12],["No links or attachments",-8]]},
+    situation:"After the incident someone lowered the filter threshold to 60. It now holds nine emails from Alder Supplies, a long-standing supplier announcing new bank details. The explanation shows strong reasons on both sides.",
+    q:"How do you handle these nine emails?",
+    opts:[
+     {t:"Send them to a human review queue with the model's explanation attached, and check the bank change with Alder by phone using the number already on file.",q:"best",mins:20,imp:0,exp:0,
+      fb:"Good human oversight. The model is uncertain and the decision is about money, so a person should decide. The explanation helps the reviewer see why the model was unsure.",
+      after:[["10:32","Finance","Alder confirmed bank change by phone · 9 emails released","ok"]]},
+     {t:"Quarantine all nine automatically. The model scored them above 60.",q:"poor",mins:1,imp:20,exp:0,
+      fb:"This is a false positive. Blocking a real supplier delays payments and damages trust. A threshold change made in a hurry needs checking, and borderline scores need a person."},
+     {t:"Release all nine without checking. The supplier is well known.",q:"ok",mins:1,imp:0,exp:10,
+      fb:"The supplier is probably real, but a bank-detail change is exactly what invoice fraud looks like. Check it by phone using a number you already hold."}
+    ]},
+  { stage:4, title:"Getting back to normal",
+    events:[["11:10","Forensics","37 emails were forwarded before containment · includes a supplier payment schedule and 4 staff payslips","warn"]],
+    situation:"The account is clean. The investigation shows 37 emails left the company before containment, including a payment schedule and four staff payslips (personal data).",
+    q:"What does recovery look like?",
+    opts:[
+     {t:"Restore the clerk's access with multi-factor sign-in, monitor the account for 30 days, ask finance to confirm any payment changes by phone, and assess the payslips under UK GDPR (report to the ICO within 72 hours if required).",q:"best",mins:45,imp:0,exp:0,
+      fb:"Complete recovery. It covers the person, the account, the fraud risk and your legal duty. Payslips are personal data, so you must decide whether this needs reporting to the ICO within 72 hours."},
+     {t:"Restore access and close the incident.",q:"poor",mins:5,imp:5,exp:20,
+      fb:"The forwarded payment schedule leaves you open to follow-up fraud, and the payslips raise a data-protection question that has a legal deadline."},
+     {t:"Keep the clerk locked out for a week as a precaution.",q:"poor",mins:5,imp:15,exp:0,
+      fb:"The account is already secure. Locking it out only stops someone doing their job and feels like a punishment, which makes people less likely to report the next mistake."}
+    ]},
+  { stage:5, title:"Learning from it",
+    events:[["Next day","Case","Incident #4471 ready for post-incident review","info"]],
+    situation:"Time to make the next incident smaller.",
+    q:"Which follow-up actions do you agree?",
+    opts:[
+     {t:"Hold a blameless review, add an automatic inbox-rule check to the playbook, retrain the classifier with the confirmed labels, and give finance a short phishing refresher.",q:"best",mins:60,imp:0,exp:0,
+      fb:"Each action fixes a real gap: the playbook, the model, and the people. A blameless review means staff keep reporting quickly."},
+     {t:"Start disciplinary action against the clerk.",q:"poor",mins:30,imp:10,exp:0,
+      fb:"Blame teaches staff to hide mistakes, and the clerk reported nothing late. Good phishing is designed to fool careful people."},
+     {t:"Replace the email security product.",q:"poor",mins:120,imp:10,exp:0,
+      fb:"The product caught the attack. The gaps were in process and follow-up, so changing tools wouldn't fix them."}
+    ]}
+  ]},
+{ id:"ransom", title:"Night-time ransomware at Northfield Clinic", sector:"Healthcare",start:"02:41",
+  blurb:"Files start renaming themselves on a clinic file server at 2am. Backups, patient data and a 72-hour reporting clock are all in play.",
+  skills:["Isolation","Prioritisation","Backups & reporting"],
+  steps:[
+  { stage:1, title:"Files are being encrypted",
+    events:[["02:39","EDR","FS-02: unknown process renaming files to *.lckd at about 400 files a minute","crit"],
+            ["02:40","EDR","RECEP-PC07: same process hash detected","crit"],
+            ["02:41","Anomaly detector","Isolation Forest score 0.94 on file-write behaviour","crit"]],
+    risk:{model:"Decision tree + anomaly score",score:97,features:[["Mass file renaming",30],["Critical asset (file server)",22],["Same process on 2 hosts",20],["Out of hours",10],["Known software",0]]},
+    situation:"It's 02:41. The clinic file server and a reception PC are both running a process that is encrypting files. There's one on-call analyst: you.",
+    q:"What's your first action?",
+    opts:[
+     {t:"Isolate both machines from the network using the endpoint tool, but leave them powered on.",q:"best",mins:15,auto:1,imp:10,exp:0,
+      fb:"Correct. High severity on a critical asset is the textbook case for automatic isolation. Keeping them powered on keeps the evidence in memory.",
+      after:[["02:42","EDR","FS-02 and RECEP-PC07 network-isolated","ok"]]},
+     {t:"Page the IT manager and wait for their decision in the morning.",q:"poor",mins:240,imp:40,exp:30,
+      fb:"Ransomware spreads in minutes, not hours. Waiting until morning could leave every reachable file server encrypted.",
+      after:[["03:30","EDR","PHARM-PC02, FS-01: encryption activity","crit"]]},
+     {t:"Shut down the entire clinic network.",q:"ok",mins:20,imp:30,exp:0,
+      fb:"It stops the spread, but it also takes down appointment, pharmacy and on-call systems. Targeted isolation does the same job with far less harm."},
+     {t:"Restart the file server to stop the process.",q:"poor",mins:10,imp:15,exp:10,
+      fb:"Restarting wipes evidence held in memory, and the ransomware usually starts again on boot. Isolate first, investigate second."}
+    ]},
+  { stage:1, title:"How did they get in?",
+    events:[["02:58","Logs","01:58 RDP login to RECEP-PC07 from the internet as svc_backup","crit"],
+            ["03:02","Logs","svc_backup then connected to FS-02 over SMB","warn"]],
+    situation:"Logs show the attacker logged in remotely to the reception PC at 01:58 using an old backup service account with a weak password, then moved to the file server.",
+    q:"What do you do with this finding?",
+    opts:[
+     {t:"Disable svc_backup, close remote desktop (RDP) access from the internet, and search all machines for other logins by that account.",q:"best",mins:35,auto:6,imp:5,exp:0,
+      fb:"You've closed the way in and checked for other footholds in one move. Finding the entry point is what stops reinfection.",
+      after:[["03:10","Identity","svc_backup disabled · no other hosts used it","ok"]]},
+     {t:"Block the attacker's IP address.",q:"poor",mins:5,imp:0,exp:15,
+      fb:"The attacker simply comes back from a new address with the same valid account. Block the account and the open door, not just the address."},
+     {t:"Force every member of staff to reset their password now.",q:"ok",mins:60,imp:15,exp:5,
+      fb:"It's broadly safe, but it's slow and disruptive at 3am, and it misses the real problem: a service account and an open remote-desktop door."}
+    ]},
+  { stage:2, title:"47 alerts, one analyst",
+    events:[["03:15","SIEM","47 open alerts after isolation","warn"]],
+    risk:{model:"ML priority ranking (top alert)",score:91,features:[["Patient records database",28],["Unusual SMB from FS-02",24],["Data leaving to unknown IP",22],["Outside backup window",9],["Printer queue errors (other alert)",-30]]},
+    situation:"The risk-scoring model ranks the alerts. At the top (91): unusual traffic from the patient-records database server towards an unknown internet address. Near the bottom (22): reception printer offline.",
+    q:"Which do you look at first?",
+    opts:[
+     {t:"The patient-records database server, as the model ranks it.",q:"best",mins:20,imp:0,exp:0,
+      fb:"Right. Risk scoring points scarce people at the highest-impact work. You find the attacker copying data out and block it.",
+      after:[["03:24","Firewall","Outbound transfer from DB-01 blocked · about 2 GB sent before block","warn"]]},
+     {t:"Work through the alerts in the order they arrived.",q:"poor",mins:90,imp:5,exp:30,
+      fb:"Arrival order treats a printer the same as a patient-records leak. By the time you reach the database, the data has gone."},
+     {t:"Fix the printer first. Reception opens at 8am.",q:"poor",mins:15,imp:0,exp:25,
+      fb:"Useful later, but it's the lowest-risk item. Data is leaving the clinic while you fix the printer."}
+    ]},
+  { stage:3, title:"Removing the attacker",
+    events:[["04:10","Forensics","Scheduled task ‘UpdateSvc’ found on FS-02 and RECEP-PC07 · runs the ransomware at start-up","warn"],
+            ["04:12","Email","Ransom note received: 4 BTC for a decryptor","crit"]],
+    situation:"You've found a hidden scheduled task that would restart the ransomware. The attackers are asking for 4 bitcoin.",
+    q:"How do you get rid of the threat?",
+    opts:[
+     {t:"Rebuild the affected machines from known-good images, and check every other machine for the same scheduled task.",q:"best",mins:180,auto:90,imp:10,exp:0,
+      fb:"Rebuilding is the only way to be sure. Checking the other machines for the same task makes sure nothing is left behind."},
+     {t:"Run an antivirus scan, delete the task, and put the machines back.",q:"ok",mins:60,imp:5,exp:10,
+      fb:"You might get it all, but you can't prove it. Attackers often leave more than one way back in."},
+     {t:"Pay the ransom to get files back quickly.",q:"poor",mins:240,imp:20,exp:20,
+      fb:"Paying doesn't remove the attacker, doesn't guarantee a working decryptor, and the money may go to a sanctioned group. UK authorities advise against paying."}
+    ]},
+  { stage:4, title:"Restoring services",
+    events:[["06:30","Backup","Last offline backup: 22:00 (clean) · online backup share: encrypted","warn"]],
+    situation:"The online backup share was encrypted too. A clean offline backup from 22:00 last night exists. Clinics open at 08:00.",
+    q:"How do you restore?",
+    opts:[
+     {t:"Restore from the 22:00 offline backup and check it is complete. Bring systems back in priority order: clinical and appointments first. Watch closely for signs of reinfection.",q:"best",mins:150,auto:100,imp:-15,exp:0,
+      fb:"Priority-ordered recovery from a trusted backup. You lose four hours of night-time changes, which is a small price, and monitoring catches any comeback."},
+     {t:"Restore everything at once as fast as possible.",q:"ok",mins:120,imp:-5,exp:5,
+      fb:"It's quicker on paper, but everything competes for bandwidth, and if anything is still infected you've spread it again."},
+     {t:"Wait in case a free decryptor appears online.",q:"poor",mins:600,imp:30,exp:0,
+      fb:"There may never be one. You have a clean backup, so use it."}
+    ]},
+  { stage:5, title:"Reporting and lessons",
+    events:[["09:00","Case","Patient data may have been copied out (about 2 GB)","warn"]],
+    situation:"About 2 GB was copied out from the patient-records server before you blocked it. The clinic is an NHS provider.",
+    q:"What do you do now?",
+    opts:[
+     {t:"Report to the ICO within 72 hours and through the NHS Data Security and Protection Toolkit, tell affected patients if the risk to them is high, and hold a blameless review: remove internet RDP, enforce MFA, keep offline backups.",q:"best",mins:120,imp:0,exp:0,
+      fb:"You meet the legal deadline, are open with patients, and fix the root causes rather than the symptoms."},
+     {t:"Wait until the investigation is fully finished before telling anyone.",q:"poor",mins:0,imp:10,exp:0,
+      fb:"The 72-hour clock starts when you become aware of the breach. You can report early and add details later."},
+     {t:"Only report it if it becomes public.",q:"poor",mins:0,imp:25,exp:0,
+      fb:"That breaks the law, harms the patients involved, and does lasting damage to trust when it comes out."}
+    ]}
+  ]},
+{ id:"k8s", title:"Crypto-miner in the checkout cluster", sector:"Retail · cloud",start:"14:03",
+  blurb:"A shell appears inside a Kubernetes container that should never run one. Containers vanish quickly, and the attacker learns to slip under your detector.",
+  skills:["Cloud-native forensics","Immutable rebuilds","Adversarial ML"],
+  steps:[
+  { stage:1, title:"A shell where there should be none",
+    events:[["14:01","Runtime sensor","Shell spawned in pod checkout-api-7f9c (namespace: shop)","crit"],
+            ["14:02","Network","checkout-api-7f9c → pool.minexmr-like host on port 4444","crit"],
+            ["14:03","LSTM sequence model","Unusual system-call sequence · score 0.88","warn"]],
+    risk:{model:"Sequence anomaly + rules",score:88,features:[["Interactive shell in production",27],["Outbound to mining pool",25],["Internet-facing service",14],["CPU jump to 95%",12],["Recent deploy (normal)",-6]]},
+    situation:"A runtime sensor shows someone opened a command shell inside a running checkout container, and that container is now talking to a cryptocurrency-mining server. Containers like this can disappear in minutes.",
+    q:"What's your first move?",
+    opts:[
+     {t:"Cut the pod off from the network with a deny-all policy, and take a snapshot of its filesystem and memory before anything restarts it.",q:"best",mins:25,auto:3,imp:5,exp:0,
+      fb:"Correct for cloud-native systems. Containers are short-lived, so you capture evidence first or lose it. Network isolation stops the harm without deleting anything.",
+      after:[["14:06","Kubernetes","Pod isolated · snapshot saved to the forensics bucket","ok"]]},
+     {t:"Delete the pod.",q:"ok",mins:2,imp:0,exp:5,
+      fb:"Kubernetes will just start a new copy from the same vulnerable image, and the evidence is gone. It feels decisive but teaches you nothing.",
+      after:[["14:09","Runtime sensor","New pod checkout-api-2b1d: shell spawned again","crit"]]},
+     {t:"Ignore it for now. It's only using CPU.",q:"poor",mins:0,imp:10,exp:20,
+      fb:"An attacker who can run commands in your checkout service can do much more than mine coins, such as reading secrets or card data flows."},
+     {t:"Scale the checkout service to zero.",q:"poor",mins:3,imp:40,exp:0,
+      fb:"It stops the attacker by stopping the business. Isolating the one affected pod does the job with no outage."}
+    ]},
+  { stage:1, title:"What could the attacker reach?",
+    events:[["14:25","Image scan","checkout-api:2.14 uses a template library with a known remote-code-execution flaw","crit"],
+            ["14:27","RBAC review","Pod service account can read ALL secrets in namespace ‘shop’","warn"]],
+    situation:"The image has a known remote-code-execution flaw (the likely way in). Worse, the container's service account could read every secret in the shop namespace, including the payment-gateway key.",
+    q:"What do you do about the secrets?",
+    opts:[
+     {t:"Rotate every secret that service account could read (starting with the payment key), and cut the account's permissions to only what checkout needs.",q:"best",mins:60,auto:10,imp:5,exp:0,
+      fb:"Assume anything the attacker could reach has been taken. Rotating secrets makes stolen copies useless, and least privilege shrinks the next blast radius.",
+      after:[["14:40","Secrets","12 secrets rotated · service account limited to 2","ok"]]},
+     {t:"Leave the secrets. There's no proof they were read.",q:"poor",mins:0,imp:0,exp:35,
+      fb:"Missing logs aren't proof that nothing happened. If the payment key was taken, the attacker can use it long after you've cleaned up."},
+     {t:"Delete the whole shop namespace and start again.",q:"poor",mins:240,imp:45,exp:0,
+      fb:"Massive disruption, and if you redeploy the same image and permissions, the hole is still there."}
+    ]},
+  { stage:3, title:"Fixing it properly",
+    events:[["15:05","Pipeline","Patched library available (template-lib 3.4.2)","info"]],
+    situation:"A patched version of the vulnerable library is available.",
+    q:"How do you remove the flaw?",
+    opts:[
+     {t:"Rebuild the image with the patched library, scan it, and redeploy through the normal pipeline so every pod is replaced.",q:"best",mins:40,auto:12,imp:0,exp:0,
+      fb:"This is immutable infrastructure: replace, don't repair. Every running copy is identical, tested and traceable."},
+     {t:"Exec into each running pod and update the library by hand.",q:"poor",mins:50,imp:5,exp:10,
+      fb:"The fix disappears the next time a pod restarts from the old image, and the pods now differ from what the pipeline thinks is deployed."},
+     {t:"Roll back to the previous image version.",q:"ok",mins:10,imp:0,exp:10,
+      fb:"Quick, but check it first: the previous image uses the same vulnerable library, so the door stays open."}
+    ]},
+  { stage:3, title:"The attacker learns your detector",
+    events:[["Day 3","Billing","Cluster CPU cost up 12% week on week","warn"],
+            ["Day 3","LSTM sequence model","Highest anomaly score 0.38 (alert threshold 0.50)","info"]],
+    risk:{model:"Sequence anomaly model",score:38,features:[["Mining traffic at low rate",9],["Activity spread over many pods",7],["Mimics normal batch-job timing",-14],["No interactive shell",-12],["Normal CPU per pod",-10]]},
+    situation:"Three days later costs are creeping up, but the anomaly model says everything is normal. A second attacker is mining slowly across many pods, staying under the model's threshold.",
+    q:"How do you respond?",
+    opts:[
+     {t:"Add a different kind of signal (block and alert on known mining-pool addresses from threat intelligence), then retrain the model with these evasion examples.",q:"best",mins:90,auto:30,imp:0,exp:0,
+      fb:"This is a defence against adversarial ML. Attackers tune themselves to one model, so a second, unrelated signal catches what the first misses. Retraining then hardens the model."},
+     {t:"Drop the alert threshold from 0.50 to 0.20 everywhere.",q:"poor",mins:5,imp:15,exp:0,
+      fb:"You'll catch this, plus thousands of false alarms. The team stops reading alerts, which is the alert fatigue that automation is meant to cure."},
+     {t:"Trust the model. It says the cluster is normal.",q:"poor",mins:0,imp:10,exp:15,
+      fb:"Models can be fooled on purpose. A real-world signal like rising cost is evidence too, and should be explained, not ignored."}
+    ]},
+  { stage:5, title:"Stopping it happening again",
+    events:[["Day 5","Case","Post-incident review scheduled","info"]],
+    situation:"Both waves are cleared. What becomes permanent?",
+    q:"Which improvements do you adopt?",
+    opts:[
+     {t:"Hold a blameless review, add an admission rule that blocks images with critical flaws, set least-privilege service accounts as the default, and update the container playbook (isolate → snapshot → rotate → rebuild).",q:"best",mins:120,imp:0,exp:0,
+      fb:"Each fix prevents a step in this attack chain. The playbook captures what worked so the next responder starts ahead."},
+     {t:"Ban shells in containers by policy and leave the rest as it is.",q:"ok",mins:20,imp:0,exp:5,
+      fb:"A sensible control, but it doesn't touch the vulnerable images or the over-powered accounts that made this serious."},
+     {t:"Move checkout off Kubernetes.",q:"poor",mins:600,imp:30,exp:0,
+      fb:"The platform wasn't the cause. The same flaws would come with you."}
+    ]}
+  ]}
+];
+
+/* ---------------- state ---------------- */
+var S = {view:"start", learner:"", mode:"soar", scen:null, i:0, picked:null, mins:0, imp:10, exp:0, log:[], feed:[], order:[]};
+function el(h){var d=document.createElement("div");d.innerHTML=h.trim();return d.firstChild}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function clamp(n){return Math.max(0,Math.min(100,n))}
+function fmtMins(m){var h=Math.floor(m/60),r=m%60;return (h?h+"h ":"")+r+"m"}
+function addClock(start,m){var p=start.split(":"),t=(+p[0])*60+(+p[1])+m;t=((t%1440)+1440)%1440;return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0")}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var x=a[i];a[i]=a[j];a[j]=x}return a}
+try{S.learner=localStorage.getItem("irsim-learner")||""}catch(e){}
+
+var app=document.getElementById("app");
+function render(){ app.innerHTML=""; if(S.view==="start")renderStart(); else if(S.view==="run")renderRun(); else renderDebrief(); }
+
+/* ---------------- start ---------------- */
+function renderStart(){
+  app.appendChild(el(
+  '<section class="intro"><div>'+
+   '<p class="eyebrow">'+(CFG.orgName?esc(CFG.orgName)+' · ':'')+'Security operations training</p>'+
+   '<h1>Incident Response Drill Room</h1>'+
+   '<p class="lede">Run a live incident from first alert to lessons learned. Read the alert feed, weigh the risk model’s reasoning, and choose what to do at each stage. Every choice costs time and changes how much harm the incident causes. You get feedback after each decision and a full debrief at the end.</p>'+
+   '<ul class="lifecycle">'+STAGES.map(function(s){return '<li>'+s+'</li>'}).join("")+'</ul>'+
+  '</div>'+
+  '<form class="setup" id="setup"><div><label for="learner">Your name (shown on the completion record)</label><input type="text" id="learner" autocomplete="name" placeholder="e.g. Sam Patel" value="'+esc(S.learner)+'"></div>'+
+   '<div class="mode" role="radiogroup" aria-label="Preparation"><span class="eyebrow">Preparation · how is your team equipped?</span>'+
+    '<label class="opt"><input type="radio" name="mode" id="mode-soar" value="soar" '+(S.mode==="soar"?"checked":"")+'><span><b>SOAR playbooks in place</b><small>Routine steps run automatically, so they take minutes instead of hours.</small></span></label>'+
+    '<label class="opt"><input type="radio" name="mode" id="mode-manual" value="manual" '+(S.mode==="manual"?"checked":"")+'><span><b>Manual response only</b><small>Every step is done by hand. Try both and compare your time to resolve.</small></span></label>'+
+   '</div><p class="note">Pass mark: '+CFG.passMark+'%. Choices are shuffled each run.</p></form>'+
+  '</section>'));
+  var g=el('<section><h2 style="margin-bottom:12px">Choose a scenario</h2><div class="scen-grid"></div></section>');
+  SCENARIOS.forEach(function(sc){
+    var b=el('<button class="scen" type="button"><span class="eyebrow">'+esc(sc.sector)+' · '+sc.steps.length+' decisions</span><h3>'+esc(sc.title)+'</h3><p>'+esc(sc.blurb)+'</p><span class="meta">'+sc.skills.map(function(k){return '<span class="tag">'+esc(k)+'</span>'}).join("")+'</span><span class="go">Start this incident →</span></button>');
+    b.addEventListener("click",function(){begin(sc)});
+    g.querySelector(".scen-grid").appendChild(b);
+  });
+  app.appendChild(g);
+  document.getElementById("setup").addEventListener("submit",function(e){e.preventDefault()});
+  document.getElementById("learner").addEventListener("input",function(e){S.learner=e.target.value;try{localStorage.setItem("irsim-learner",S.learner)}catch(x){}});
+  app.querySelectorAll('input[name=mode]').forEach(function(r){r.addEventListener("change",function(){S.mode=r.value})});
+}
+function begin(sc){
+  S.scen=sc;S.i=0;S.picked=null;S.mins=0;S.imp=10;S.exp=0;S.log=[];S.feed=[];S.view="run";
+  pushEvents(sc.steps[0].events); S.order=shuffle(sc.steps[0].opts.map(function(_,k){return k}));
+  render(); window.scrollTo(0,0);
+}
+function pushEvents(evs){(evs||[]).forEach(function(e){S.feed.unshift({t:e[0],s:e[1],m:e[2],l:e[3],n:true})})}
+
+/* ---------------- run ---------------- */
+function renderRun(){
+  var sc=S.scen, st=sc.steps[S.i], cur=st.stage;
+  var strip=el('<header class="strip"><div class="who"><p class="eyebrow">Incident · '+esc(sc.sector)+' · '+(S.mode==="soar"?"SOAR playbooks":"Manual response")+'</p><h2>'+esc(sc.title)+'</h2></div>'+
+   '<div class="clock"><div><span class="eyebrow">Incident clock</span><span class="v">'+addClock(sc.start,S.mins)+'</span></div><div><span class="eyebrow">Time spent</span><span class="v">'+fmtMins(S.mins)+'</span></div><div><span class="eyebrow">Decision</span><span class="v">'+(S.i+1)+' / '+sc.steps.length+'</span></div></div></header>');
+  app.appendChild(strip);
+  var ol=el('<ol class="stages" aria-label="Incident response lifecycle"></ol>');
+  STAGES.forEach(function(s,k){ol.appendChild(el('<li class="'+(k<cur?"done":k===cur?"now":"")+'">'+(k+1)+' · '+s+'</li>'))});
+  app.appendChild(ol);
+
+  var con=el('<div class="console"></div>');
+  /* feed */
+  var feed=el('<section class="pane" aria-label="Alert feed"><div class="row"><h3>Alert feed</h3><span class="eyebrow">newest first</span></div><ul class="feed"></ul></section>');
+  S.feed.forEach(function(f){feed.querySelector(".feed").appendChild(el('<li class="'+f.l+(f.n?" new":"")+'"><span class="t">'+esc(f.t)+'</span> <span class="s">'+esc(f.s)+'</span><br>'+esc(f.m)+'</li>'));f.n=false});
+  /* desk */
+  var desk=el('<section class="pane desk" aria-live="polite"><p class="eyebrow">'+STAGES[cur]+'</p><h2>'+esc(st.title)+'</h2><p class="situation">'+esc(st.situation)+'</p><p class="q">'+esc(st.q)+'</p><div class="opts"></div></section>');
+  var keys="ABCD";
+  S.order.forEach(function(k,pos){
+    var o=st.opts[k], autoOn=S.mode==="soar"&&o.auto!=null;
+    var b=el('<button class="opt-btn" type="button"><span class="k">'+keys[pos]+'</span><span>'+esc(o.t)+(autoOn?'<span class="auto">playbook</span>':'')+'</span></button>');
+    if(S.picked!==null){ b.disabled=true; if(k===S.picked)b.classList.add("picked",o.q); else if(o.q==="best"&&st.opts[S.picked].q!=="best")b.classList.add("reveal"); }
+    else b.addEventListener("click",function(){choose(k)});
+    desk.querySelector(".opts").appendChild(b);
+  });
+  if(S.picked!==null){
+    var o=st.opts[S.picked], v={best:"Strong decision",ok:"Partly right",poor:"Risky decision"}[o.q];
+    var best=st.opts.filter(function(x){return x.q==="best"})[0];
+    var fbh='<div class="feedback '+o.q+'"><span class="verdict">'+v+' · +'+({best:10,ok:5,poor:0}[o.q])+' pts · '+fmtMins(costOf(o))+'</span><p>'+esc(o.fb)+'</p>'+
+      (o.q!=="best"?'<p class="principle"><b>Better option:</b> '+esc(best.t)+'</p>':'')+'</div>';
+    desk.appendChild(el(fbh));
+    var last=S.i===sc.steps.length-1;
+    var nb=el('<div class="row"><span class="note">'+(last?"That was the final decision.":"Next: "+esc(sc.steps[S.i+1].title))+'</span><button class="btn" type="button" id="next">'+(last?"See debrief":"Continue")+'</button></div>');
+    nb.querySelector("#next").addEventListener("click",next);
+    desk.appendChild(nb);
+  }
+  /* gauges */
+  var side=el('<section class="pane" aria-label="Risk and impact"></section>');
+  if(st.risk){
+    var r=st.risk, sev=r.score>=80?"crit":r.score>=50?"warn":"ok";
+    var max=Math.max.apply(null,r.features.map(function(f){return Math.abs(f[1])}));
+    var sh=r.features.map(function(f){var w=Math.abs(f[1])/max*50,pos=f[1]>=0;
+      return '<div class="f"><span>'+esc(f[0])+'</span><span class="track"><i style="background:var(--'+(pos?"crit":"ok")+');'+(pos?"left:50%":"right:50%")+';width:'+w+'%"></i><span class="mid"></span></span><span class="n">'+(pos?"+":"")+f[1]+'</span></div>'}).join("");
+    side.appendChild(el('<div><p class="eyebrow">Model risk score</p><div class="row"><span class="score-big">'+r.score+'</span><span class="pill '+sev+'">'+(sev==="crit"?"High":sev==="warn"?"Medium":"Low")+'</span></div><p class="note">'+esc(r.model)+'</p></div>'));
+    side.appendChild(el('<div class="shap"><p class="eyebrow">Why the model scored it this way</p>'+sh+'<p class="note">Red pushes the score up, green pulls it down (feature contributions, SHAP-style).</p></div>'));
+  } else side.appendChild(el('<div><p class="eyebrow">Model risk score</p><p class="note">No model score for this decision. This one is a judgement call for the responder.</p></div>'));
+  side.appendChild(gauge("Business disruption",S.imp));
+  side.appendChild(gauge("Data exposure",S.exp));
+  side.appendChild(el('<p class="note">Lower is better on both gauges. Your choices move them.</p>'));
+  con.appendChild(feed);con.appendChild(desk);con.appendChild(side);
+  app.appendChild(con);
+}
+function gauge(label,v){var c=v>=60?"crit":v>=30?"warn":"ok";return el('<div class="gauge"><div class="lbl"><span>'+label+'</span><span class="mono">'+Math.round(v)+' / 100</span></div><div class="bar" role="meter" aria-label="'+label+'" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+Math.round(v)+'"><span style="width:'+v+'%;background:var(--'+c+')"></span></div></div>')}
+function costOf(o){return (S.mode==="soar"&&o.auto!=null)?o.auto:o.mins}
+function choose(k){
+  var st=S.scen.steps[S.i],o=st.opts[k];
+  S.picked=k; S.mins+=costOf(o); S.imp=clamp(S.imp+o.imp); S.exp=clamp(S.exp+o.exp);
+  S.log.push({step:st.title,stage:STAGES[st.stage],choice:o.t,quality:o.q,points:{best:10,ok:5,poor:0}[o.q],minutes:costOf(o),fb:o.fb,best:st.opts.filter(function(x){return x.q==="best"})[0].t});
+  pushEvents(o.after); render();
+  var d=app.querySelector(".feedback"); if(d&&window.innerWidth<980)d.scrollIntoView({block:"nearest"});
+}
+function next(){
+  var sc=S.scen;
+  if(S.i===sc.steps.length-1){S.view="debrief";render();window.scrollTo(0,0);finish();return}
+  S.i++;S.picked=null;S.order=shuffle(sc.steps[S.i].opts.map(function(_,k){return k}));
+  pushEvents(sc.steps[S.i].events);render();window.scrollTo(0,0);
+}
+
+/* ---------------- debrief ---------------- */
+var RECORD=null;
+function finish(){
+  var pts=S.log.reduce(function(a,x){return a+x.points},0),max=S.log.length*10,pct=Math.round(pts/max*100);
+  RECORD={type:"irsim-result",tool:"Incident Response Drill Room",organisation:CFG.orgName||null,learner:S.learner||"Anonymous",scenario:S.scen.title,
+    mode:S.mode==="soar"?"SOAR playbooks":"Manual",scorePercent:pct,passMark:CFG.passMark,passed:pct>=CFG.passMark,minutesToResolve:S.mins,
+    businessDisruption:Math.round(S.imp),dataExposure:Math.round(S.exp),
+    decisions:S.log.map(function(x){return {stage:x.stage,decision:x.step,quality:x.quality,points:x.points}}),completedAt:new Date().toISOString()};
+  try{ if(window.parent&&window.parent!==window) window.parent.postMessage(RECORD,CFG.postMessageOrigin) }catch(e){}
+  renderDebrief();
+}
+function renderDebrief(){
+  if(!RECORD){return}
+  app.innerHTML="";
+  var R=RECORD, other=S.mode==="soar"?"manual response":"SOAR playbooks";
+  /* compare with the other mode for the same choices */
+  var alt=0; S.scen.steps.forEach(function(st,i){var o=st.opts.filter(function(x){return x.t===S.log[i].choice})[0]; alt+= S.mode==="soar"?o.mins:(o.auto!=null?o.auto:o.mins)});
+  app.appendChild(el('<header><p class="eyebrow">Debrief · '+esc(R.scenario)+'</p><h1>'+(R.passed?"Incident handled":"Incident needs another run")+'</h1><p class="lede" style="color:var(--muted);max-width:62ch;margin-top:8px">'+(R.passed?"You kept the harm down and followed the lifecycle. Review the partly-right calls below.":"Some choices let the incident grow. Read the feedback below and run the scenario again. The options are shuffled each time.")+'</p></header>'));
+  var top=el('<div class="debrief-top"></div>');
+  [["Score",R.scorePercent+"%",(R.passed?"Pass":"Below pass mark")+" ("+R.passMark+"%)"],["Time to resolve",fmtMins(R.minutesToResolve),"Same choices with "+other+": "+fmtMins(alt)],["Business disruption",R.businessDisruption+" / 100","Lower is better"],["Data exposure",R.dataExposure+" / 100","Lower is better"]]
+   .forEach(function(s){top.appendChild(el('<div class="stat"><p class="eyebrow">'+s[0]+'</p><p class="v">'+s[1]+'</p><p class="note">'+esc(s[2])+'</p></div>'))});
+  app.appendChild(top);
+  var rv=el('<section class="pane"><h2>Decision review</h2><ol class="review"></ol></section>');
+  S.log.forEach(function(x){rv.querySelector(".review").appendChild(el('<li class="'+x.quality+'"><span class="eyebrow">'+esc(x.stage)+' · '+x.points+' pts · '+fmtMins(x.minutes)+'</span><h3>'+esc(x.step)+'</h3><p><b>You chose:</b> '+esc(x.choice)+'</p><p class="principle">'+esc(x.fb)+'</p>'+(x.quality!=="best"?'<p class="principle"><b>Better option:</b> '+esc(x.best)+'</p>':'')+'</li>'))});
+  app.appendChild(rv);
+  var rec=el('<section class="pane"><div class="row"><h2>Completion record</h2><div class="row" style="justify-content:flex-end"><button class="btn ghost" type="button" id="copy">Copy record</button><button class="btn" type="button" id="again">Try another scenario</button></div></div><p class="note">If this page runs inside your organisation’s portal, this record has already been sent to it. Otherwise, copy it and paste it into your training log.</p><pre class="record" id="rec"></pre><p class="note" id="copied" aria-live="polite"></p></section>');
+  rec.querySelector("#rec").textContent=JSON.stringify(R,null,2);
+  rec.querySelector("#copy").addEventListener("click",function(){var t=JSON.stringify(R,null,2),m=rec.querySelector("#copied");
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){m.textContent="Copied."},function(){sel()})}else sel();
+    function sel(){var r=document.createRange();r.selectNodeContents(rec.querySelector("#rec"));var s=getSelection();s.removeAllRanges();s.addRange(r);m.textContent="Selected. Press Ctrl+C (or ⌘C) to copy."}});
+  rec.querySelector("#again").addEventListener("click",function(){S.view="start";RECORD=null;render();window.scrollTo(0,0)});
+  app.appendChild(rec);
+}
+render();
+</script>
+
+</body>
+</html>
